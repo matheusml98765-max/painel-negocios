@@ -569,6 +569,7 @@
           relatorio.push(produto.nome + ': -' + qtdVendida + ' (de ' + qtdAntes + ' para ' + produto.quantidade + ')');
         }
       });
+      t.estoqueAplicado = true;
     });
     return relatorio;
   }
@@ -720,6 +721,28 @@
   }
 
   function renderImportarTab(wrap) {
+    var pendentesEstoque = state.transacoes.filter(function (t) { return t.tipo === 'venda' && Array.isArray(t.itens) && !t.estoqueAplicado; });
+    if (pendentesEstoque.length > 0) {
+      var pendCard = el('div', { class: 'pml-card' });
+      pendCard.appendChild(el('p', { class: 'pml-section-title', text: 'Baixa de estoque pendente' }));
+      pendCard.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Existem ' + pendentesEstoque.length + ' venda(s) já registradas que ainda não descontaram o estoque (normalmente porque o produto foi cadastrado ou ligado ao código do anúncio depois da venda ter sido importada). Clique para aplicar agora.' }));
+      var resultPend = el('div', {});
+      pendCard.appendChild(el('button', {
+        class: 'pml-btn', text: 'Aplicar baixa de estoque agora',
+        onclick: function () {
+          salvarSnapshotUndo();
+          var baixas = baixarEstoquePorVendas(pendentesEstoque);
+          saveProdutos();
+          saveTransacoes();
+          resultPend.innerHTML = '';
+          resultPend.appendChild(el('div', { class: 'pml-import-summary', style: 'margin-top:10px;', html: baixas.length > 0 ? ('<b>Estoque atualizado:</b><br>' + baixas.join('<br>')) : 'Nenhum produto cadastrado corresponde ao código dessas vendas ainda.' }));
+          render();
+        }
+      }));
+      pendCard.appendChild(resultPend);
+      wrap.appendChild(pendCard);
+    }
+
     var syncCard = el('div', { class: 'pml-card' });
     syncCard.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Mercado Livre)' }));
     syncCard.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do seu arquivo na nuvem (gist) uma única vez. Toda vez que você abrir esse painel, ele busca sozinho os dados mais recentes, sem precisar importar arquivo.' }));
