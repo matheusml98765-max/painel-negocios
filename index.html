@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel — Mercado Livre</title>
+</head>
+<body>
+<div id="app-root">
+  <div id="loading-state" style="padding: 3rem 1rem; text-align: center; color: #6B6558; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    Carregando seu painel...
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  #app-root * { box-sizing: border-box; }
+  #app-root {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #FAF7F2;
+    color: #22281F;
+    min-height: 100vh;
+    padding: 0;
+  }
+  .pml-wrap { max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  .pml-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+  .pml-title { font-family: Georgia, 'Iowan Old Style', serif; font-size: 26px; font-weight: 700; margin: 0 0 4px; color: #1B2016; }
+  .pml-subtitle { font-size: 14px; color: #6B6558; margin: 0; }
+  .pml-tabs { display: flex; gap: 4px; background: #F1ECE2; padding: 4px; border-radius: 10px; margin-bottom: 1.75rem; width: fit-content; }
+  .pml-tab { border: none; background: transparent; padding: 8px 18px; font-size: 14px; font-weight: 600; color: #6B6558; border-radius: 7px; cursor: pointer; font-family: inherit; }
+  .pml-tab.active { background: #FFFFFF; color: #1B2016; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .pml-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+  .pml-metric { background: #FFFFFF; border: 1px solid #E4DDCF; border-radius: 12px; padding: 16px 18px; }
+  .pml-metric-label { font-size: 12px; color: #6B6558; margin: 0 0 6px; }
+  .pml-metric-value { font-size: 22px; font-weight: 700; margin: 0; color: #1B2016; }
+  .pml-metric-value.pos { color: #2F6E52; }
+  .pml-metric-value.neg { color: #B23A2E; }
+  .pml-section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; color: #1B2016; }
+  .pml-card { background: #FFFFFF; border: 1px solid #E4DDCF; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .pml-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .pml-field label { display: block; font-size: 12px; color: #6B6558; margin-bottom: 4px; }
+  .pml-field input, .pml-field select { width: 100%; padding: 8px 10px; border: 1px solid #D8D0C0; border-radius: 7px; font-size: 14px; font-family: inherit; background: #FFFDF9; }
+  .pml-field input:focus, .pml-field select:focus { outline: none; border-color: #C97A2B; }
+  .pml-btn { background: #C97A2B; color: #FFFFFF; border: none; padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .pml-btn:hover { background: #B26A22; }
+  .pml-btn.secondary { background: transparent; color: #B23A2E; border: 1px solid #E4DDCF; padding: 5px 10px; font-size: 12px; }
+  .pml-btn.secondary:hover { background: #FBEFEC; }
+  .pml-error { color: #B23A2E; font-size: 12px; margin: -6px 0 12px; }
+  .pml-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pml-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: #6B6558; padding: 8px 10px; border-bottom: 1px solid #E4DDCF; }
+  .pml-table td { padding: 10px 10px; border-bottom: 1px solid #F1ECE2; }
+  .pml-table tr:last-child td { border-bottom: none; }
+  .pml-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pml-badge.venda { background: #E1F0E7; color: #2F6E52; }
+  .pml-badge.compra { background: #FCEFE2; color: #A15D1B; }
+  .pml-badge.despesa { background: #FBEAE7; color: #B23A2E; }
+  .pml-badge.devolucao { background: #F2E7F5; color: #7A3E92; }
+  .pml-badge.cancelamento { background: #EFEAE0; color: #6B6558; }
+  .pml-badge.reembolso { background: #FBEAE7; color: #B23A2E; }
+  .pml-empty { text-align: center; padding: 2rem 1rem; color: #6B6558; font-size: 14px; }
+  .pml-margin { font-size: 12px; color: #6B6558; }
+  .pml-drop { border: 2px dashed #D8D0C0; border-radius: 12px; padding: 28px 20px; text-align: center; background: #FFFDF9; }
+  .pml-drop input { display: block; margin: 10px auto 0; }
+  .pml-import-summary { background: #F1ECE2; border-radius: 10px; padding: 14px 16px; margin-top: 14px; font-size: 13px; line-height: 1.7; }
+  .pml-import-summary b { color: #1B2016; }
+  .pml-note { font-size: 12px; color: #6B6558; margin-top: 8px; line-height: 1.6; }
+</style>
+
+<script>
+(function () {
+  // Fora do ambiente do Claude (ex: GitHub Pages), window.storage não existe.
+  // Este polyfill usa o localStorage do navegador nesse caso, sem mudar o resto do código.
+  if (!window.storage) {
+    window.storage = {
+      get: function (key) {
+        var v = localStorage.getItem('pml_' + key);
+        return Promise.resolve(v === null ? null : { key: key, value: v });
+      },
+      set: function (key, value) {
+        localStorage.setItem('pml_' + key, value);
+        return Promise.resolve({ key: key, value: value });
+      }
+    };
+  }
+
+  var root = document.getElementById('app-root');
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', ultimaSincronizacao: '', sincronizando: false, confirmarLimpeza: false, editandoProdutoId: null };
+
+  function fmtMoney(n) {
+    var v = Number(n);
+    if (isNaN(v)) v = 0;
+    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  var pilhaUndo = [];
+  var pilhaRedo = [];
+
+  function estadoAtualSnapshot() {
+    return {
+      produtos: JSON.parse(JSON.stringify(state.produtos)),
+      transacoes: JSON.parse(JSON.stringify(state.transacoes))
+    };
+  }
+
+  function salvarSnapshotUndo() {
+    pilhaUndo.push(estadoAtualSnapshot());
+    if (pilhaUndo.length > 20) pilhaUndo.shift();
+    pilhaRedo = [];
+  }
+
+  function desfazer() {
+    if (pilhaUndo.length === 0) return;
+    pilhaRedo.push(estadoAtualSnapshot());
+    var anterior = pilhaUndo.pop();
+    state.produtos = anterior.produtos;
+    state.transacoes = anterior.transacoes;
+    saveProdutos();
+    saveTransacoes();
+    render();
+  }
+
+  function refazer() {
+    if (pilhaRedo.length === 0) return;
+    pilhaUndo.push(estadoAtualSnapshot());
+    var proximo = pilhaRedo.pop();
+    state.produtos = proximo.produtos;
+    state.transacoes = proximo.transacoes;
+    saveProdutos();
+    saveTransacoes();
+    render();
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      var alvo = e.target;
+      var digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'SELECT' || alvo.tagName === 'TEXTAREA');
+      if (!digitando) {
+        e.preventDefault();
+        if (e.shiftKey) { refazer(); } else { desfazer(); }
+      }
+    }
+  });
+
+  async function loadData() {
+    try {
+      var p = await window.storage.get('ml-produtos');
+      state.produtos = p ? JSON.parse(p.value) : [];
+    } catch (e) { state.produtos = []; }
+    try {
+      var t = await window.storage.get('ml-transacoes');
+      state.transacoes = t ? JSON.parse(t.value) : [];
+    } catch (e) { state.transacoes = []; }
+    try {
+      var g = await window.storage.get('ml-gist-url');
+      state.gistUrl = g ? g.value : '';
+    } catch (e) { state.gistUrl = ''; }
+    try {
+      var u = await window.storage.get('ml-ultima-sync');
+      state.ultimaSincronizacao = u ? u.value : '';
+    } catch (e) { state.ultimaSincronizacao = ''; }
+    state.loaded = true;
+    render();
+    if (state.gistUrl) { sincronizarGist(true); }
+  }
+
+  async function salvarGistUrl(url) {
+    state.gistUrl = url;
+    try { await window.storage.set('ml-gist-url', url); } catch (e) {}
+  }
+
+  async function sincronizarGist(silencioso) {
+    if (!state.gistUrl) return;
+    state.sincronizando = true;
+    if (!silencioso) render();
+    try {
+      var resposta = await fetch(state.gistUrl + (state.gistUrl.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
+      var texto = await resposta.text();
+      var resultado = parseApiJson(texto);
+      if (!resultado.erro && resultado.novas.length > 0) {
+        salvarSnapshotUndo();
+        state.transacoes = state.transacoes.concat(resultado.novas);
+        state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
+        await saveTransacoes();
+      }
+      state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
+      try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
+      state.errorMsg = '';
+    } catch (e) {
+      state.errorMsg = 'Não consegui sincronizar com a nuvem agora. Confere sua internet ou a URL configurada.';
+    }
+    state.sincronizando = false;
+    render();
+  }
+
+  async function saveProdutos() {
+    try {
+      await window.storage.set('ml-produtos', JSON.stringify(state.produtos));
+    } catch (e) { state.errorMsg = 'Não consegui salvar. Tenta de novo.'; render(); }
+  }
+
+  async function saveTransacoes() {
+    try {
+      await window.storage.set('ml-transacoes', JSON.stringify(state.transacoes));
+    } catch (e) { state.errorMsg = 'Não consegui salvar. Tenta de novo.'; render(); }
+  }
+
+  function calcMetrics() {
+    var valorEstoque = state.produtos.reduce(function (sum, p) {
+      return sum + (Number(p.custo) || 0) * (Number(p.quantidade) || 0);
+    }, 0);
+    var qtdProdutos = state.produtos.length;
+
+    var now = new Date();
+    var mesAtual = now.getMonth();
+    var anoAtual = now.getFullYear();
+    var entradasMes = 0, saidasMes = 0;
+    state.transacoes.forEach(function (t) {
+      var d = new Date(t.data + 'T00:00:00');
+      if (d.getMonth() === mesAtual && d.getFullYear() === anoAtual) {
+        if (t.tipo === 'venda') entradasMes += Number(t.valor) || 0;
+        else saidasMes += Number(t.valor) || 0;
+      }
+      // compra, despesa, devolucao, cancelamento e reembolso contam como saída do mês
+    });
+    var saldoMes = entradasMes - saidasMes;
+    var entradasTotal = 0, saidasTotal = 0;
+    state.transacoes.forEach(function (t) {
+      if (t.tipo === 'venda') entradasTotal += Number(t.valor) || 0;
+      else saidasTotal += Number(t.valor) || 0;
+    });
+    var saldoTotal = entradasTotal - saidasTotal;
+    return { valorEstoque: valorEstoque, qtdProdutos: qtdProdutos, saldoMes: saldoMes, saldoTotal: saldoTotal };
+  }
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === 'text') e.textContent = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) e.appendChild(c); });
+    return e;
+  }
+
+  function renderHeader(wrap) {
+    var header = el('div', { class: 'pml-header' }, [
+      el('div', {}, [
+        el('p', { class: 'pml-title', text: 'Painel — Mercado Livre' }),
+        el('p', { class: 'pml-subtitle', text: 'Estoque e financeiro da sua revenda, só seus.' })
+      ])
+    ]);
+    if (pilhaUndo.length > 0 || pilhaRedo.length > 0) {
+      var undoRow = el('div', { style: 'display:flex; gap:6px;' });
+      undoRow.appendChild(el('button', {
+        class: 'pml-btn secondary', style: pilhaUndo.length === 0 ? 'opacity:0.4; cursor:default;' : '', text: '↩ Desfazer',
+        onclick: function () { if (pilhaUndo.length > 0) desfazer(); }
+      }));
+      undoRow.appendChild(el('button', {
+        class: 'pml-btn secondary', style: pilhaRedo.length === 0 ? 'opacity:0.4; cursor:default;' : '', text: 'Refazer ↪',
+        onclick: function () { if (pilhaRedo.length > 0) refazer(); }
+      }));
+      header.appendChild(undoRow);
+    }
+    wrap.appendChild(header);
+  }
+
+  function renderTabs(wrap) {
+    var tabs = el('div', { class: 'pml-tabs' });
+    [['geral', 'Visão geral'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
+      var btn = el('button', {
+        class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
+        text: t[1],
+        onclick: function () { state.tab = t[0]; render(); }
+      });
+      tabs.appendChild(btn);
+    });
+    wrap.appendChild(tabs);
+  }
+
+  function sincronizacaoAtrasada() {
+    if (!state.gistUrl) return false;
+    if (!state.ultimaSincronizacao) return true;
+    var partes = state.ultimaSincronizacao.match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2})/);
+    if (!partes) return false;
+    var dataSync = new Date(partes[3], partes[2] - 1, partes[1], partes[4], partes[5]);
+    var horasPassadas = (Date.now() - dataSync.getTime()) / (1000 * 60 * 60);
+    return horasPassadas > 48;
+  }
+
+  function renderMetrics(wrap) {
+    var m = calcMetrics();
+    var grid = el('div', { class: 'pml-metrics' }, [
+      el('div', { class: 'pml-metric' }, [
+        el('p', { class: 'pml-metric-label', text: 'Valor em estoque (custo)' }),
+        el('p', { class: 'pml-metric-value', text: fmtMoney(m.valorEstoque) })
+      ]),
+      el('div', { class: 'pml-metric' }, [
+        el('p', { class: 'pml-metric-label', text: 'Produtos cadastrados' }),
+        el('p', { class: 'pml-metric-value', text: String(m.qtdProdutos) })
+      ]),
+      el('div', { class: 'pml-metric' }, [
+        el('p', { class: 'pml-metric-label', text: 'Saldo do mês' }),
+        el('p', { class: 'pml-metric-value ' + (m.saldoMes >= 0 ? 'pos' : 'neg'), text: fmtMoney(m.saldoMes) })
+      ]),
+      el('div', { class: 'pml-metric' }, [
+        el('p', { class: 'pml-metric-label', text: 'Saldo total (todo o período importado)' }),
+        el('p', { class: 'pml-metric-value ' + (m.saldoTotal >= 0 ? 'pos' : 'neg'), text: fmtMoney(m.saldoTotal) })
+      ])
+    ]);
+    wrap.appendChild(grid);
+  }
+
+  function renderEstoqueTab(wrap) {
+    var formError = el('div', { class: 'pml-error', style: 'display:none' });
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Adicionar produto' }));
+
+    var nomeInput = el('input', { placeholder: 'Ex: Fone bluetooth XYZ' });
+    var custoInput = el('input', { type: 'number', step: '0.01', placeholder: '0,00' });
+    var vendaInput = el('input', { type: 'number', step: '0.01', placeholder: '0,00' });
+    var qtdInput = el('input', { type: 'number', step: '1', placeholder: '0' });
+
+    var grid = el('div', { class: 'pml-form-grid' }, [
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Produto' }), nomeInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de custo' }), custoInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de venda' }), vendaInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Quantidade' }), qtdInput])
+    ]);
+    card.appendChild(grid);
+    card.appendChild(formError);
+
+    var addBtn = el('button', {
+      class: 'pml-btn', text: 'Adicionar produto',
+      onclick: function () {
+        var nome = nomeInput.value.trim();
+        var custo = custoInput.value;
+        var venda = vendaInput.value;
+        var qtd = qtdInput.value;
+        if (!nome || custo === '' || venda === '' || qtd === '') {
+          formError.textContent = 'Preencha todos os campos antes de adicionar.';
+          formError.style.display = 'block';
+          return;
+        }
+        formError.style.display = 'none';
+        salvarSnapshotUndo();
+        state.produtos.push({ id: uid(), nome: nome, custo: custo, venda: venda, quantidade: qtd });
+        saveProdutos();
+        render();
+      }
+    });
+    card.appendChild(addBtn);
+    wrap.appendChild(card);
+
+    var listCard = el('div', { class: 'pml-card' });
+    listCard.appendChild(el('p', { class: 'pml-section-title', text: 'Seus produtos' }));
+    if (state.produtos.length === 0) {
+      listCard.appendChild(el('div', { class: 'pml-empty', text: 'Nenhum produto cadastrado ainda.' }));
+    } else {
+      var table = el('table', { class: 'pml-table' });
+      table.appendChild(el('tr', {}, [
+        el('th', { text: 'Produto' }),
+        el('th', { text: 'Custo' }),
+        el('th', { text: 'Venda' }),
+        el('th', { text: 'Qtd' }),
+        el('th', { text: 'Margem' }),
+        el('th', { text: '' })
+      ]));
+      state.produtos.forEach(function (p) {
+        var custo = Number(p.custo) || 0;
+        var venda = Number(p.venda) || 0;
+        var margem = venda > 0 ? (((venda - custo) / venda) * 100).toFixed(1) : '0.0';
+
+        if (state.editandoProdutoId === p.id) {
+          var editNome = el('input', { value: p.nome, style: 'width:100%;' });
+          var editCusto = el('input', { type: 'number', step: '0.01', value: p.custo, style: 'width:80px;' });
+          var editVenda = el('input', { type: 'number', step: '0.01', value: p.venda, style: 'width:80px;' });
+          var editQtd = el('input', { type: 'number', step: '1', value: p.quantidade, style: 'width:60px;' });
+          var rowEdit = el('tr', {}, [
+            el('td', {}, [editNome]),
+            el('td', {}, [editCusto]),
+            el('td', {}, [editVenda]),
+            el('td', {}, [editQtd]),
+            el('td', { class: 'pml-margin', text: '—' }),
+            el('td', { style: 'white-space:nowrap;' }, [
+              el('button', {
+                class: 'pml-btn', style: 'padding:5px 10px; font-size:12px; margin-right:4px;', text: 'Salvar',
+                onclick: function () {
+                  salvarSnapshotUndo();
+                  p.nome = editNome.value.trim() || p.nome;
+                  p.custo = editCusto.value;
+                  p.venda = editVenda.value;
+                  p.quantidade = editQtd.value;
+                  state.editandoProdutoId = null;
+                  saveProdutos();
+                  render();
+                }
+              }),
+              el('button', {
+                class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;', text: 'Cancelar',
+                onclick: function () { state.editandoProdutoId = null; render(); }
+              })
+            ])
+          ]);
+          table.appendChild(rowEdit);
+          return;
+        }
+
+        var row = el('tr', {}, [
+          el('td', { text: p.nome }),
+          el('td', { text: fmtMoney(custo) }),
+          el('td', { text: fmtMoney(venda) }),
+          el('td', { text: String(p.quantidade) }),
+          el('td', { class: 'pml-margin', text: margem + '%' }),
+          el('td', { style: 'white-space:nowrap;' }, [
+            el('button', {
+              class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px; margin-right:4px;', text: 'Editar',
+              onclick: function () { state.editandoProdutoId = p.id; render(); }
+            }),
+            el('button', {
+              class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;', text: 'Remover',
+              onclick: function () {
+                salvarSnapshotUndo();
+                state.produtos = state.produtos.filter(function (x) { return x.id !== p.id; });
+                saveProdutos();
+                render();
+              }
+            })
+          ])
+        ]);
+        table.appendChild(row);
+      });
+      listCard.appendChild(table);
+    }
+    wrap.appendChild(listCard);
+  }
+
+  function renderFinanceiroTab(wrap) {
+    var formError = el('div', { class: 'pml-error', style: 'display:none' });
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Lançar movimentação' }));
+
+    var dataInput = el('input', { type: 'date' });
+    var tipoSelect = el('select', {}, [
+      el('option', { value: 'venda', text: 'Venda' }),
+      el('option', { value: 'compra', text: 'Compra' }),
+      el('option', { value: 'despesa', text: 'Despesa' }),
+      el('option', { value: 'devolucao', text: 'Devolução' }),
+      el('option', { value: 'cancelamento', text: 'Cancelamento' }),
+      el('option', { value: 'reembolso', text: 'Reembolso' })
+    ]);
+    var descInput = el('input', { placeholder: 'Ex: Venda fone bluetooth' });
+    var valorInput = el('input', { type: 'number', step: '0.01', placeholder: '0,00' });
+
+    var grid = el('div', { class: 'pml-form-grid' }, [
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Data' }), dataInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Tipo' }), tipoSelect]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Descrição' }), descInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Valor' }), valorInput])
+    ]);
+    card.appendChild(grid);
+    card.appendChild(formError);
+
+    var addBtn = el('button', {
+      class: 'pml-btn', text: 'Lançar',
+      onclick: function () {
+        var data = dataInput.value;
+        var desc = descInput.value.trim();
+        var valor = valorInput.value;
+        if (!data || !desc || valor === '') {
+          formError.textContent = 'Preencha data, descrição e valor.';
+          formError.style.display = 'block';
+          return;
+        }
+        formError.style.display = 'none';
+        salvarSnapshotUndo();
+        state.transacoes.push({ id: uid(), data: data, tipo: tipoSelect.value, descricao: desc, valor: valor });
+        state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
+        saveTransacoes();
+        render();
+      }
+    });
+    card.appendChild(addBtn);
+    wrap.appendChild(card);
+
+    var listCard = el('div', { class: 'pml-card' });
+    listCard.appendChild(el('p', { class: 'pml-section-title', text: 'Movimentações' }));
+    if (state.transacoes.length === 0) {
+      listCard.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma movimentação lançada ainda.' }));
+    } else {
+      var table = el('table', { class: 'pml-table' });
+      table.appendChild(el('tr', {}, [
+        el('th', { text: 'Data' }),
+        el('th', { text: 'Tipo' }),
+        el('th', { text: 'Descrição' }),
+        el('th', { text: 'Valor' }),
+        el('th', { text: 'Origem' }),
+        el('th', { text: '' })
+      ]));
+      state.transacoes.forEach(function (t) {
+        var dParts = t.data.split('-');
+        var dispData = dParts.length === 3 ? dParts[2] + '/' + dParts[1] + '/' + dParts[0] : t.data;
+        var row = el('tr', {}, [
+          el('td', { text: dispData }),
+          el('td', {}, [el('span', { class: 'pml-badge ' + t.tipo, text: t.tipo })]),
+          el('td', { text: t.descricao }),
+          el('td', { text: fmtMoney(t.valor) }),
+          el('td', { class: 'pml-margin', text: origemLabel(t) }),
+          el('td', {}, [el('button', {
+            class: 'pml-btn secondary', text: 'Remover',
+            onclick: function () {
+              salvarSnapshotUndo();
+              state.transacoes = state.transacoes.filter(function (x) { return x.id !== t.id; });
+              saveTransacoes();
+              render();
+            }
+          })])
+        ]);
+        table.appendChild(row);
+      });
+      listCard.appendChild(table);
+    }
+    wrap.appendChild(listCard);
+  }
+
+  function origemLabel(t) {
+    if (!t.origemId) return 'Manual';
+    if (t.origemId.indexOf('api-ml-') === 0) return 'API Mercado Livre';
+    if (t.origemId.indexOf('ml-') === 0) return 'Importado ML';
+    if (t.origemId.indexOf('shopee-') === 0) return 'Importado Shopee';
+    return 'Importado';
+  }
+
+  function jaImportado(origemId) {
+    return state.transacoes.some(function (t) { return t.origemId === origemId; });
+  }
+
+  function parseMercadoLivreCsv(text) {
+    var linhas = text.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
+    if (linhas.length < 2) return { novas: [], ignoradas: 0 };
+    var header = linhas[0].split(';');
+    var idxTipo = header.indexOf('TRANSACTION_TYPE');
+    var idxData = header.indexOf('TRANSACTION_DATE');
+    var idxValor = header.indexOf('REAL_AMOUNT');
+    var idxSource = header.indexOf('SOURCE_ID');
+    if (idxTipo === -1 || idxValor === -1) return { novas: [], ignoradas: 0, erro: true };
+    var novas = [];
+    var ignoradas = 0;
+    for (var i = 1; i < linhas.length; i++) {
+      var cols = linhas[i].split(';');
+      var tipoRaw = (cols[idxTipo] || '').trim();
+      var valor = parseFloat(cols[idxValor]);
+      var dataRaw = (cols[idxData] || '').trim();
+      var data = dataRaw ? dataRaw.split('T')[0] : '';
+      var sourceId = (cols[idxSource] || '').trim();
+      var origemId = 'ml-' + sourceId + '-' + tipoRaw + '-' + i;
+      if (isNaN(valor) || !data) { continue; }
+      var tipoFinal = null;
+      if (tipoRaw === 'SETTLEMENT' || tipoRaw === 'SETTLEMENT_SHIPPING') tipoFinal = 'venda';
+      else if (tipoRaw === 'REFUND') tipoFinal = 'reembolso';
+      else if (tipoRaw === 'DISPUTE') tipoFinal = 'devolucao';
+      if (!tipoFinal) { ignoradas++; continue; }
+      if (jaImportado(origemId)) { ignoradas++; continue; }
+      novas.push({
+        id: uid(), origemId: origemId, data: data, tipo: tipoFinal,
+        descricao: 'Mercado Livre - pedido ' + sourceId + ' (' + tipoRaw + ')',
+        valor: Math.abs(valor)
+      });
+    }
+    return { novas: novas, ignoradas: ignoradas };
+  }
+
+  function parseShopeeRows(rows) {
+    var headerIdx = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].indexOf('Tipo de transação') !== -1) { headerIdx = i; break; }
+    }
+    if (headerIdx === -1) return { novas: [], ignoradas: 0, erro: true };
+    var novas = [];
+    var ignoradas = 0;
+    for (var i = headerIdx + 1; i < rows.length; i++) {
+      var r = rows[i];
+      if (!r || r.length < 6) continue;
+      var dataRaw = String(r[0] || '').trim();
+      var tipoRaw = String(r[1] || '').trim();
+      var descricao = String(r[2] || '').trim();
+      var idPedido = String(r[3] || '').trim();
+      var direcao = String(r[4] || '').trim();
+      var valor = parseFloat(r[5]);
+      if (!dataRaw || isNaN(valor)) continue;
+      var data = dataRaw.split(' ')[0];
+      var origemId = 'shopee-' + idPedido + '-' + tipoRaw + '-' + i;
+      var tipoFinal = null;
+      var descLower = descricao.toLowerCase();
+      if (tipoRaw === 'Saques' || tipoRaw === 'Shopee Acelera') {
+        ignoradas++; continue;
+      } else if (tipoRaw === 'Renda do pedido') {
+        tipoFinal = direcao === 'Entrada' ? 'venda' : 'despesa';
+      } else if (tipoRaw === 'Ajuste') {
+        tipoFinal = (descLower.indexOf('reembolso') !== -1 || descLower.indexOf('devolução') !== -1 || descLower.indexOf('devolucao') !== -1) ? 'reembolso' : 'despesa';
+      } else if (tipoRaw === 'Saldo da Carteira - Pagamento') {
+        tipoFinal = 'despesa';
+      } else {
+        ignoradas++; continue;
+      }
+      if (jaImportado(origemId)) { ignoradas++; continue; }
+      novas.push({
+        id: uid(), origemId: origemId, data: data, tipo: tipoFinal,
+        descricao: 'Shopee - ' + (descricao || tipoRaw) + (idPedido && idPedido !== '-' ? ' (' + idPedido + ')' : ''),
+        valor: Math.abs(valor)
+      });
+    }
+    return { novas: novas, ignoradas: ignoradas };
+  }
+
+  function parseApiJson(texto) {
+    var novas = [];
+    var ignoradas = 0;
+    var dados;
+    try { dados = JSON.parse(texto); } catch (e) { return { novas: [], ignoradas: 0, erro: true }; }
+    if (!Array.isArray(dados)) return { novas: [], ignoradas: 0, erro: true };
+    dados.forEach(function (item, i) {
+      var tipo = item.tipo;
+      var valor = parseFloat(item.valor);
+      var dataRaw = String(item.data || '').trim();
+      if (!dataRaw || isNaN(valor) || ['venda', 'compra', 'despesa', 'devolucao', 'cancelamento', 'reembolso'].indexOf(tipo) === -1) {
+        ignoradas++; return;
+      }
+      var data = dataRaw.split('T')[0];
+      var origemId = 'api-ml-' + item.id + '-' + tipo;
+      if (jaImportado(origemId)) { ignoradas++; return; }
+      novas.push({
+        id: uid(), origemId: origemId, data: data, tipo: tipo,
+        descricao: 'Mercado Livre (API) - pedido ' + item.id,
+        valor: Math.abs(valor)
+      });
+    });
+    return { novas: novas, ignoradas: ignoradas };
+  }
+
+  function processarArquivo(file, onDone) {
+    var nome = file.name.toLowerCase();
+    if (nome.endsWith('.json')) {
+      var readerJson = new FileReader();
+      readerJson.onload = function (e) { onDone(parseApiJson(e.target.result), 'Mercado Livre (API)'); };
+      readerJson.onerror = function () { onDone({ novas: [], ignoradas: 0, erro: true }, '—'); };
+      readerJson.readAsText(file);
+    } else if (nome.endsWith('.csv')) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var texto = e.target.result;
+        if (texto.indexOf('TRANSACTION_TYPE') !== -1) {
+          onDone(parseMercadoLivreCsv(texto), 'Mercado Livre');
+        } else {
+          // tenta como planilha shopee exportada em csv (linhas separadas por vírgula)
+          var linhas = texto.split(/\r?\n/).map(function (l) { return l.split(','); });
+          onDone(parseShopeeRows(linhas), 'Shopee');
+        }
+      };
+      reader.onerror = function () { onDone({ novas: [], ignoradas: 0, erro: true }, '—'); };
+      reader.readAsText(file);
+    } else {
+      var reader2 = new FileReader();
+      reader2.onload = function (e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+          var sheet = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+          onDone(parseShopeeRows(rows), 'Shopee');
+        } catch (err) {
+          onDone({ novas: [], ignoradas: 0, erro: true }, '—');
+        }
+      };
+      reader2.onerror = function () { onDone({ novas: [], ignoradas: 0, erro: true }, '—'); };
+      reader2.readAsArrayBuffer(file);
+    }
+  }
+
+  function renderImportarTab(wrap) {
+    var syncCard = el('div', { class: 'pml-card' });
+    syncCard.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Mercado Livre)' }));
+    syncCard.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do seu arquivo na nuvem (gist) uma única vez. Toda vez que você abrir esse painel, ele busca sozinho os dados mais recentes, sem precisar importar arquivo.' }));
+    var urlInput = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_classificados.json', value: state.gistUrl, style: 'width:100%; padding:8px 10px; border:1px solid #D8D0C0; border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    syncCard.appendChild(urlInput);
+    var btnRow = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
+    var salvarBtn = el('button', {
+      class: 'pml-btn', text: 'Salvar e sincronizar agora',
+      onclick: function () {
+        salvarGistUrl(urlInput.value.trim());
+        sincronizarGist(false);
+      }
+    });
+    btnRow.appendChild(salvarBtn);
+    if (state.gistUrl) {
+      var atualizarBtn = el('button', {
+        class: 'pml-btn secondary', style: 'color:#2F6E52; border-color:#E4DDCF;', text: state.sincronizando ? 'Sincronizando...' : 'Sincronizar agora',
+        onclick: function () { sincronizarGist(false); }
+      });
+      btnRow.appendChild(atualizarBtn);
+    }
+    syncCard.appendChild(btnRow);
+    if (state.ultimaSincronizacao) {
+      syncCard.appendChild(el('p', { style: 'font-size:12px; color:#6B6558; margin-top:10px;', text: 'Última sincronização: ' + state.ultimaSincronizacao }));
+    }
+    wrap.appendChild(syncCard);
+
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Importar relatório manualmente' }));
+    card.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Envie o arquivo pedidos_classificados.json gerado pelo script de integração automática, o relatório financeiro do Mercado Livre (CSV de settlement) ou o relatório de transações da Shopee (XLSX ou CSV). O painel identifica o formato sozinho.' }));
+
+    var drop = el('div', { class: 'pml-drop' });
+    drop.appendChild(el('span', { text: '📄 Selecione o arquivo (.json, .csv, .xlsx ou .xls)' }));
+    var fileInput = el('input', { type: 'file', accept: '.json,.csv,.xlsx,.xls' });
+    drop.appendChild(fileInput);
+    var resultBox = el('div', { style: 'display:none' });
+    drop.appendChild(resultBox);
+    card.appendChild(drop);
+
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files[0];
+      if (!file) return;
+      resultBox.style.display = 'block';
+      resultBox.innerHTML = '';
+      resultBox.appendChild(el('div', { class: 'pml-import-summary', text: 'Lendo arquivo...' }));
+      processarArquivo(file, function (resultado, origem) {
+        resultBox.innerHTML = '';
+        if (resultado.erro) {
+          resultBox.appendChild(el('div', { class: 'pml-import-summary', text: 'Não consegui reconhecer o formato desse arquivo. Confere se é o relatório de settlement do Mercado Livre ou o relatório de transações da Shopee.' }));
+          return;
+        }
+        if (resultado.novas.length > 0) {
+          salvarSnapshotUndo();
+          state.transacoes = state.transacoes.concat(resultado.novas);
+          state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
+          saveTransacoes();
+        }
+        var summary = el('div', { class: 'pml-import-summary' });
+        summary.appendChild(el('div', { html: '<b>' + origem + '</b>: ' + resultado.novas.length + ' movimentações importadas, ' + resultado.ignoradas + ' ignoradas (saques, adiantamentos ou já importadas anteriormente).' }));
+        resultBox.appendChild(summary);
+        render();
+      });
+    });
+
+    wrap.appendChild(card);
+
+    var noteCard = el('div', { class: 'pml-card' });
+    noteCard.appendChild(el('p', { class: 'pml-section-title', text: 'Como cada tipo é classificado' }));
+    var lista = el('div', { class: 'pml-note' });
+    lista.innerHTML = '<b>Mercado Livre:</b> SETTLEMENT → venda · REFUND → reembolso · DISPUTE → devolução<br><b>Shopee:</b> Renda do pedido (entrada) → venda · Ajuste com reembolso/devolução → reembolso · Saldo da Carteira - Pagamento → despesa (ex: anúncios) · Saques e Shopee Acelera → ignorados (não afetam lucro)';
+    noteCard.appendChild(lista);
+    wrap.appendChild(noteCard);
+
+    var riscoCard = el('div', { class: 'pml-card', style: 'border-color:#F0D8D2;' });
+    riscoCard.appendChild(el('p', { class: 'pml-section-title', style: 'color:#B23A2E;', text: 'Zona de risco' }));
+    if (!state.confirmarLimpeza) {
+      riscoCard.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px;', text: 'Apaga todas as ' + state.transacoes.length + ' movimentações financeiras registradas (útil ao trocar de fonte de dados, como agora). O estoque não é afetado.' }));
+      riscoCard.appendChild(el('button', {
+        class: 'pml-btn secondary', style: 'padding:9px 18px; font-size:14px;', text: 'Limpar dados financeiros',
+        onclick: function () { state.confirmarLimpeza = true; render(); }
+      }));
+    } else {
+      riscoCard.appendChild(el('p', { style: 'font-size:13px; color:#B23A2E; margin:0 0 12px; font-weight:600;', text: 'Tem certeza? Isso vai apagar as ' + state.transacoes.length + ' movimentações financeiras. Dá pra desfazer logo em seguida com Ctrl+Z, se precisar.' }));
+      var confirmRow = el('div', { style: 'display:flex; gap:8px;' });
+      confirmRow.appendChild(el('button', {
+        class: 'pml-btn', style: 'background:#B23A2E;', text: 'Sim, apagar tudo',
+        onclick: function () {
+          salvarSnapshotUndo();
+          state.transacoes = [];
+          saveTransacoes();
+          state.confirmarLimpeza = false;
+          render();
+        }
+      }));
+      confirmRow.appendChild(el('button', {
+        class: 'pml-btn secondary', text: 'Cancelar',
+        onclick: function () { state.confirmarLimpeza = false; render(); }
+      }));
+      riscoCard.appendChild(confirmRow);
+    }
+    wrap.appendChild(riscoCard);
+  }
+
+  function render() {
+    root.innerHTML = '';
+    var wrap = el('div', { class: 'pml-wrap' });
+    renderHeader(wrap);
+    renderTabs(wrap);
+    if (!state.loaded) {
+      wrap.appendChild(el('div', { class: 'pml-empty', text: 'Carregando seu painel...' }));
+      root.appendChild(wrap);
+      return;
+    }
+    if (state.errorMsg) {
+      wrap.appendChild(el('div', { class: 'pml-error', text: state.errorMsg }));
+    }
+    if (sincronizacaoAtrasada()) {
+      wrap.appendChild(el('div', { class: 'pml-import-summary', style: 'border:1px solid #F0D8D2; color:#B23A2E; margin-bottom:16px;', text: '⚠ A sincronização automática não roda há mais de 2 dias. Confere se o script no seu computador ainda está sendo executado, ou sincronize manualmente na aba Importar.' }));
+    }
+    renderMetrics(wrap);
+    if (state.tab === 'geral') {
+      var infoCard = el('div', { class: 'pml-card' }, [
+        el('p', { class: 'pml-section-title', text: 'Como usar' }),
+        el('p', { style: 'font-size:14px; color:#6B6558; margin:0; line-height:1.6;', text: 'Cadastre seus produtos na aba Estoque com o custo e a quantidade — isso alimenta o valor em estoque acima. Lance suas vendas, compras e despesas na aba Financeiro para acompanhar o saldo do mês. Tudo fica salvo aqui, é só seu.' })
+      ]);
+      wrap.appendChild(infoCard);
+    } else if (state.tab === 'estoque') {
+      renderEstoqueTab(wrap);
+    } else if (state.tab === 'financeiro') {
+      renderFinanceiroTab(wrap);
+    } else {
+      renderImportarTab(wrap);
+    }
+    root.appendChild(wrap);
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
