@@ -747,6 +747,7 @@
     }
     if (state.ultimaBaixaEstoque && state.ultimaBaixaEstoque.length > 0) {
       syncCard.appendChild(el('div', { class: 'pml-import-summary', style: 'margin-top:10px;', html: '<b>Estoque atualizado na última sincronização:</b><br>' + state.ultimaBaixaEstoque.join('<br>') }));
+    }
     wrap.appendChild(syncCard);
 
     var card = el('div', { class: 'pml-card' });
