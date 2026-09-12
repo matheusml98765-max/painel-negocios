@@ -85,7 +85,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', ultimaSincronizacao: '', sincronizando: false, confirmarLimpeza: false, editandoProdutoId: null };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', ultimaSincronizacao: '', sincronizando: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [] };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -186,6 +186,11 @@
         state.transacoes = state.transacoes.concat(resultado.novas);
         state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
         await saveTransacoes();
+        var baixas = baixarEstoquePorVendas(resultado.novas);
+        if (baixas.length > 0) {
+          await saveProdutos();
+          state.ultimaBaixaEstoque = baixas;
+        }
       }
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
@@ -327,12 +332,14 @@
     var custoInput = el('input', { type: 'number', step: '0.01', placeholder: '0,00' });
     var vendaInput = el('input', { type: 'number', step: '0.01', placeholder: '0,00' });
     var qtdInput = el('input', { type: 'number', step: '1', placeholder: '0' });
+    var mlIdInput = el('input', { placeholder: 'Ex: MLB4887954295 (opcional)' });
 
     var grid = el('div', { class: 'pml-form-grid' }, [
       el('div', { class: 'pml-field' }, [el('label', { text: 'Produto' }), nomeInput]),
       el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de custo' }), custoInput]),
       el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de venda' }), vendaInput]),
-      el('div', { class: 'pml-field' }, [el('label', { text: 'Quantidade' }), qtdInput])
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Quantidade' }), qtdInput]),
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Código do anúncio (Mercado Livre)' }), mlIdInput])
     ]);
     card.appendChild(grid);
     card.appendChild(formError);
@@ -344,6 +351,7 @@
         var custo = custoInput.value;
         var venda = vendaInput.value;
         var qtd = qtdInput.value;
+        var mlId = mlIdInput.value.trim();
         if (!nome || custo === '' || venda === '' || qtd === '') {
           formError.textContent = 'Preencha todos os campos antes de adicionar.';
           formError.style.display = 'block';
@@ -351,7 +359,7 @@
         }
         formError.style.display = 'none';
         salvarSnapshotUndo();
-        state.produtos.push({ id: uid(), nome: nome, custo: custo, venda: venda, quantidade: qtd });
+        state.produtos.push({ id: uid(), nome: nome, custo: custo, venda: venda, quantidade: qtd, mlItemId: mlId || null });
         saveProdutos();
         render();
       }
@@ -371,6 +379,7 @@
         el('th', { text: 'Venda' }),
         el('th', { text: 'Qtd' }),
         el('th', { text: 'Margem' }),
+        el('th', { text: 'Cód. ML' }),
         el('th', { text: '' })
       ]));
       state.produtos.forEach(function (p) {
@@ -383,12 +392,14 @@
           var editCusto = el('input', { type: 'number', step: '0.01', value: p.custo, style: 'width:80px;' });
           var editVenda = el('input', { type: 'number', step: '0.01', value: p.venda, style: 'width:80px;' });
           var editQtd = el('input', { type: 'number', step: '1', value: p.quantidade, style: 'width:60px;' });
+          var editMlId = el('input', { value: p.mlItemId || '', style: 'width:110px;' });
           var rowEdit = el('tr', {}, [
             el('td', {}, [editNome]),
             el('td', {}, [editCusto]),
             el('td', {}, [editVenda]),
             el('td', {}, [editQtd]),
             el('td', { class: 'pml-margin', text: '—' }),
+            el('td', {}, [editMlId]),
             el('td', { style: 'white-space:nowrap;' }, [
               el('button', {
                 class: 'pml-btn', style: 'padding:5px 10px; font-size:12px; margin-right:4px;', text: 'Salvar',
@@ -398,6 +409,7 @@
                   p.custo = editCusto.value;
                   p.venda = editVenda.value;
                   p.quantidade = editQtd.value;
+                  p.mlItemId = editMlId.value.trim() || null;
                   state.editandoProdutoId = null;
                   saveProdutos();
                   render();
@@ -419,6 +431,7 @@
           el('td', { text: fmtMoney(venda) }),
           el('td', { text: String(p.quantidade) }),
           el('td', { class: 'pml-margin', text: margem + '%' }),
+          el('td', { class: 'pml-margin', text: p.mlItemId || '—' }),
           el('td', { style: 'white-space:nowrap;' }, [
             el('button', {
               class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px; margin-right:4px;', text: 'Editar',
@@ -542,6 +555,24 @@
     return state.transacoes.some(function (t) { return t.origemId === origemId; });
   }
 
+  function baixarEstoquePorVendas(novas) {
+    var relatorio = [];
+    novas.forEach(function (t) {
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens)) return;
+      t.itens.forEach(function (item) {
+        if (!item.item_id) return;
+        var produto = state.produtos.find(function (p) { return p.mlItemId === item.item_id; });
+        if (produto) {
+          var qtdVendida = Number(item.quantidade) || 1;
+          var qtdAntes = Number(produto.quantidade) || 0;
+          produto.quantidade = Math.max(0, qtdAntes - qtdVendida);
+          relatorio.push(produto.nome + ': -' + qtdVendida + ' (de ' + qtdAntes + ' para ' + produto.quantidade + ')');
+        }
+      });
+    });
+    return relatorio;
+  }
+
   function parseMercadoLivreCsv(text) {
     var linhas = text.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
     if (linhas.length < 2) return { novas: [], ignoradas: 0 };
@@ -636,11 +667,15 @@
       var data = dataRaw.split('T')[0];
       var origemId = 'api-ml-' + item.id + '-' + tipo;
       if (jaImportado(origemId)) { ignoradas++; return; }
-      novas.push({
+      var transacaoNova = {
         id: uid(), origemId: origemId, data: data, tipo: tipo,
         descricao: 'Mercado Livre (API) - pedido ' + item.id,
         valor: Math.abs(valor)
-      });
+      };
+      if (tipo === 'venda' && Array.isArray(item.itens)) {
+        transacaoNova.itens = item.itens;
+      }
+      novas.push(transacaoNova);
     });
     return { novas: novas, ignoradas: ignoradas };
   }
@@ -710,6 +745,8 @@
     if (state.ultimaSincronizacao) {
       syncCard.appendChild(el('p', { style: 'font-size:12px; color:#6B6558; margin-top:10px;', text: 'Última sincronização: ' + state.ultimaSincronizacao }));
     }
+    if (state.ultimaBaixaEstoque && state.ultimaBaixaEstoque.length > 0) {
+      syncCard.appendChild(el('div', { class: 'pml-import-summary', style: 'margin-top:10px;', html: '<b>Estoque atualizado na última sincronização:</b><br>' + state.ultimaBaixaEstoque.join('<br>') }));
     wrap.appendChild(syncCard);
 
     var card = el('div', { class: 'pml-card' });
@@ -742,8 +779,13 @@
           state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
           saveTransacoes();
         }
+        var baixas = baixarEstoquePorVendas(resultado.novas);
+        if (baixas.length > 0) { saveProdutos(); }
         var summary = el('div', { class: 'pml-import-summary' });
         summary.appendChild(el('div', { html: '<b>' + origem + '</b>: ' + resultado.novas.length + ' movimentações importadas, ' + resultado.ignoradas + ' ignoradas (saques, adiantamentos ou já importadas anteriormente).' }));
+        if (baixas.length > 0) {
+          summary.appendChild(el('div', { style: 'margin-top:8px; font-size:12px;', html: '<b>Estoque atualizado:</b><br>' + baixas.join('<br>') }));
+        }
         resultBox.appendChild(summary);
         render();
       });
