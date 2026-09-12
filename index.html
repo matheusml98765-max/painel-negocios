@@ -191,6 +191,8 @@
           await saveProdutos();
           state.ultimaBaixaEstoque = baixas;
         }
+      } else if (!resultado.erro && resultado.atualizadas > 0) {
+        await saveTransacoes();
       }
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
@@ -655,9 +657,10 @@
   function parseApiJson(texto) {
     var novas = [];
     var ignoradas = 0;
+    var atualizadas = 0;
     var dados;
-    try { dados = JSON.parse(texto); } catch (e) { return { novas: [], ignoradas: 0, erro: true }; }
-    if (!Array.isArray(dados)) return { novas: [], ignoradas: 0, erro: true };
+    try { dados = JSON.parse(texto); } catch (e) { return { novas: [], ignoradas: 0, atualizadas: 0, erro: true }; }
+    if (!Array.isArray(dados)) return { novas: [], ignoradas: 0, atualizadas: 0, erro: true };
     dados.forEach(function (item, i) {
       var tipo = item.tipo;
       var valor = parseFloat(item.valor);
@@ -667,7 +670,16 @@
       }
       var data = dataRaw.split('T')[0];
       var origemId = 'api-ml-' + item.id + '-' + tipo;
-      if (jaImportado(origemId)) { ignoradas++; return; }
+      var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
+      if (existente) {
+        if (tipo === 'venda' && Array.isArray(item.itens) && !Array.isArray(existente.itens)) {
+          existente.itens = item.itens;
+          atualizadas++;
+        } else {
+          ignoradas++;
+        }
+        return;
+      }
       var transacaoNova = {
         id: uid(), origemId: origemId, data: data, tipo: tipo,
         descricao: 'Mercado Livre (API) - pedido ' + item.id,
@@ -678,7 +690,7 @@
       }
       novas.push(transacaoNova);
     });
-    return { novas: novas, ignoradas: ignoradas };
+    return { novas: novas, ignoradas: ignoradas, atualizadas: atualizadas };
   }
 
   function processarArquivo(file, onDone) {
