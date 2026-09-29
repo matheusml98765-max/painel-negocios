@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel — Mercado Livre</title>
+<title>Painel — Mercado Livre e Shopee</title>
 </head>
 <body>
 <div id="app-root">
@@ -85,7 +85,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', ultimaSincronizacao: '', sincronizando: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [] };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [] };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -160,17 +160,31 @@
       state.gistUrl = g ? g.value : '';
     } catch (e) { state.gistUrl = ''; }
     try {
+      var gs = await window.storage.get('ml-gist-url-shopee');
+      state.gistUrlShopee = gs ? gs.value : '';
+    } catch (e) { state.gistUrlShopee = ''; }
+    try {
       var u = await window.storage.get('ml-ultima-sync');
       state.ultimaSincronizacao = u ? u.value : '';
     } catch (e) { state.ultimaSincronizacao = ''; }
+    try {
+      var us = await window.storage.get('ml-ultima-sync-shopee');
+      state.ultimaSincronizacaoShopee = us ? us.value : '';
+    } catch (e) { state.ultimaSincronizacaoShopee = ''; }
     state.loaded = true;
     render();
     if (state.gistUrl) { sincronizarGist(true); }
+    if (state.gistUrlShopee) { sincronizarGistShopee(true); }
   }
 
   async function salvarGistUrl(url) {
     state.gistUrl = url;
     try { await window.storage.set('ml-gist-url', url); } catch (e) {}
+  }
+
+  async function salvarGistUrlShopee(url) {
+    state.gistUrlShopee = url;
+    try { await window.storage.set('ml-gist-url-shopee', url); } catch (e) {}
   }
 
   async function sincronizarGist(silencioso) {
@@ -180,7 +194,7 @@
     try {
       var resposta = await fetch(state.gistUrl + (state.gistUrl.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
       var texto = await resposta.text();
-      var resultado = parseApiJson(texto);
+      var resultado = parseApiJson(texto, 'api-ml-', 'Mercado Livre');
       if (!resultado.erro && resultado.novas.length > 0) {
         salvarSnapshotUndo();
         state.transacoes = state.transacoes.concat(resultado.novas);
@@ -201,6 +215,37 @@
       state.errorMsg = 'Não consegui sincronizar com a nuvem agora. Confere sua internet ou a URL configurada.';
     }
     state.sincronizando = false;
+    render();
+  }
+
+  async function sincronizarGistShopee(silencioso) {
+    if (!state.gistUrlShopee) return;
+    state.sincronizandoShopee = true;
+    if (!silencioso) render();
+    try {
+      var resposta = await fetch(state.gistUrlShopee + (state.gistUrlShopee.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
+      var texto = await resposta.text();
+      var resultado = parseApiJson(texto, 'api-shopee-', 'Shopee');
+      if (!resultado.erro && resultado.novas.length > 0) {
+        salvarSnapshotUndo();
+        state.transacoes = state.transacoes.concat(resultado.novas);
+        state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
+        await saveTransacoes();
+        var baixas = baixarEstoquePorVendas(resultado.novas);
+        if (baixas.length > 0) {
+          await saveProdutos();
+          state.ultimaBaixaEstoque = baixas;
+        }
+      } else if (!resultado.erro && resultado.atualizadas > 0) {
+        await saveTransacoes();
+      }
+      state.ultimaSincronizacaoShopee = new Date().toLocaleString('pt-BR');
+      try { await window.storage.set('ml-ultima-sync-shopee', state.ultimaSincronizacaoShopee); } catch (e) {}
+      state.errorMsg = '';
+    } catch (e) {
+      state.errorMsg = 'Não consegui sincronizar com a Shopee agora. Confere sua internet ou a URL configurada.';
+    }
+    state.sincronizandoShopee = false;
     render();
   }
 
@@ -321,8 +366,8 @@
   function renderHeader(wrap) {
     var header = el('div', { class: 'pml-header' }, [
       el('div', {}, [
-        el('p', { class: 'pml-title', text: 'Painel — Mercado Livre' }),
-        el('p', { class: 'pml-subtitle', text: 'Estoque e financeiro da sua revenda, só seus.' })
+        el('p', { class: 'pml-title', text: 'Painel — Mercado Livre e Shopee' }),
+        el('p', { class: 'pml-subtitle', text: 'Estoque e financeiro dos seus negócios, só seus.' })
       ])
     ]);
     if (pilhaUndo.length > 0 || pilhaRedo.length > 0) {
@@ -353,14 +398,18 @@
     wrap.appendChild(tabs);
   }
 
-  function sincronizacaoAtrasada() {
-    if (!state.gistUrl) return false;
-    if (!state.ultimaSincronizacao) return true;
-    var partes = state.ultimaSincronizacao.match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2})/);
+  function fonteAtrasada(url, ultimaSync) {
+    if (!url) return false;
+    if (!ultimaSync) return true;
+    var partes = ultimaSync.match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2})/);
     if (!partes) return false;
     var dataSync = new Date(partes[3], partes[2] - 1, partes[1], partes[4], partes[5]);
     var horasPassadas = (Date.now() - dataSync.getTime()) / (1000 * 60 * 60);
     return horasPassadas > 48;
+  }
+
+  function sincronizacaoAtrasada() {
+    return fonteAtrasada(state.gistUrl, state.ultimaSincronizacao) || fonteAtrasada(state.gistUrlShopee, state.ultimaSincronizacaoShopee);
   }
 
   function renderMetrics(wrap) {
@@ -402,7 +451,7 @@
       el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de custo' }), custoInput]),
       el('div', { class: 'pml-field' }, [el('label', { text: 'Preço de venda' }), vendaInput]),
       el('div', { class: 'pml-field' }, [el('label', { text: 'Quantidade' }), qtdInput]),
-      el('div', { class: 'pml-field' }, [el('label', { text: 'Código do anúncio (Mercado Livre)' }), mlIdInput])
+      el('div', { class: 'pml-field' }, [el('label', { text: 'Código do anúncio (Mercado Livre / Shopee)' }), mlIdInput])
     ]);
     card.appendChild(grid);
     card.appendChild(formError);
@@ -442,7 +491,7 @@
         el('th', { text: 'Venda' }),
         el('th', { text: 'Qtd' }),
         el('th', { text: 'Margem' }),
-        el('th', { text: 'Cód. ML' }),
+        el('th', { text: 'Cód. anúncio' }),
         el('th', { text: '' })
       ]));
       state.produtos.forEach(function (p) {
@@ -609,6 +658,7 @@
   function origemLabel(t) {
     if (!t.origemId) return 'Manual';
     if (t.origemId.indexOf('api-ml-') === 0) return 'API Mercado Livre';
+    if (t.origemId.indexOf('api-shopee-') === 0) return 'API Shopee';
     if (t.origemId.indexOf('ml-') === 0) return 'Importado ML';
     if (t.origemId.indexOf('shopee-') === 0) return 'Importado Shopee';
     return 'Importado';
@@ -715,7 +765,9 @@
     return { novas: novas, ignoradas: ignoradas };
   }
 
-  function parseApiJson(texto) {
+  function parseApiJson(texto, origemPrefix, labelFonte) {
+    origemPrefix = origemPrefix || 'api-ml-';
+    labelFonte = labelFonte || 'Mercado Livre';
     var novas = [];
     var ignoradas = 0;
     var atualizadas = 0;
@@ -730,7 +782,7 @@
         ignoradas++; return;
       }
       var data = dataRaw.split('T')[0];
-      var origemId = 'api-ml-' + item.id + '-' + tipo;
+      var origemId = origemPrefix + item.id + '-' + tipo;
       var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
       if (existente) {
         if (tipo === 'venda' && Array.isArray(item.itens) && !Array.isArray(existente.itens)) {
@@ -743,7 +795,7 @@
       }
       var transacaoNova = {
         id: uid(), origemId: origemId, data: data, tipo: tipo,
-        descricao: 'Mercado Livre (API) - pedido ' + item.id,
+        descricao: labelFonte + ' (API) - pedido ' + item.id,
         valor: Math.abs(valor)
       };
       if (tipo === 'venda' && Array.isArray(item.itens)) {
@@ -758,7 +810,7 @@
     var nome = file.name.toLowerCase();
     if (nome.endsWith('.json')) {
       var readerJson = new FileReader();
-      readerJson.onload = function (e) { onDone(parseApiJson(e.target.result), 'Mercado Livre (API)'); };
+      readerJson.onload = function (e) { onDone(parseApiJson(e.target.result, 'api-ml-', 'Mercado Livre'), 'Mercado Livre (API)'); };
       readerJson.onerror = function () { onDone({ novas: [], ignoradas: 0, erro: true }, '—'); };
       readerJson.readAsText(file);
     } else if (nome.endsWith('.csv')) {
@@ -846,9 +898,36 @@
     }
     wrap.appendChild(syncCard);
 
+    var syncCardShopee = el('div', { class: 'pml-card' });
+    syncCardShopee.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Shopee)' }));
+    syncCardShopee.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do arquivo pedidos_shopee.json do seu gist. Funciona igual à sincronização do Mercado Livre, só que pros dados da Shopee.' }));
+    var urlInputShopee = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_shopee.json', value: state.gistUrlShopee, style: 'width:100%; padding:8px 10px; border:1px solid #D8D0C0; border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    syncCardShopee.appendChild(urlInputShopee);
+    var btnRowShopee = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
+    var salvarBtnShopee = el('button', {
+      class: 'pml-btn', text: 'Salvar e sincronizar agora',
+      onclick: function () {
+        salvarGistUrlShopee(urlInputShopee.value.trim());
+        sincronizarGistShopee(false);
+      }
+    });
+    btnRowShopee.appendChild(salvarBtnShopee);
+    if (state.gistUrlShopee) {
+      var atualizarBtnShopee = el('button', {
+        class: 'pml-btn secondary', style: 'color:#2F6E52; border-color:#E4DDCF;', text: state.sincronizandoShopee ? 'Sincronizando...' : 'Sincronizar agora',
+        onclick: function () { sincronizarGistShopee(false); }
+      });
+      btnRowShopee.appendChild(atualizarBtnShopee);
+    }
+    syncCardShopee.appendChild(btnRowShopee);
+    if (state.ultimaSincronizacaoShopee) {
+      syncCardShopee.appendChild(el('p', { style: 'font-size:12px; color:#6B6558; margin-top:10px;', text: 'Última sincronização: ' + state.ultimaSincronizacaoShopee }));
+    }
+    wrap.appendChild(syncCardShopee);
+
     var card = el('div', { class: 'pml-card' });
     card.appendChild(el('p', { class: 'pml-section-title', text: 'Importar relatório manualmente' }));
-    card.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Envie o arquivo pedidos_classificados.json gerado pelo script de integração automática, o relatório financeiro do Mercado Livre (CSV de settlement) ou o relatório de transações da Shopee (XLSX ou CSV). O painel identifica o formato sozinho.' }));
+    card.appendChild(el('p', { style: 'font-size:13px; color:#6B6558; margin:0 0 12px; line-height:1.6;', text: 'Envie o arquivo pedidos_classificados.json ou pedidos_shopee.json gerados pelo script de integração automática, o relatório financeiro do Mercado Livre (CSV de settlement) ou o relatório de transações da Shopee (XLSX ou CSV). O painel identifica o formato sozinho.' }));
 
     var drop = el('div', { class: 'pml-drop' });
     drop.appendChild(el('span', { text: '📄 Selecione o arquivo (.json, .csv, .xlsx ou .xls)' }));
@@ -893,7 +972,7 @@
     var noteCard = el('div', { class: 'pml-card' });
     noteCard.appendChild(el('p', { class: 'pml-section-title', text: 'Como cada tipo é classificado' }));
     var lista = el('div', { class: 'pml-note' });
-    lista.innerHTML = '<b>Mercado Livre:</b> SETTLEMENT → venda · REFUND → reembolso · DISPUTE → devolução<br><b>Shopee:</b> Renda do pedido (entrada) → venda · Ajuste com reembolso/devolução → reembolso · Saldo da Carteira - Pagamento → despesa (ex: anúncios) · Saques e Shopee Acelera → ignorados (não afetam lucro)';
+    lista.innerHTML = '<b>Mercado Livre:</b> SETTLEMENT → venda · REFUND → reembolso · DISPUTE → devolução<br><b>Shopee (API automática):</b> pedido COMPLETED → venda · pedido CANCELLED → cancelamento<br><b>Shopee (planilha importada manualmente):</b> Renda do pedido (entrada) → venda · Ajuste com reembolso/devolução → reembolso · Saldo da Carteira - Pagamento → despesa (ex: anúncios) · Saques e Shopee Acelera → ignorados (não afetam lucro)';
     noteCard.appendChild(lista);
     wrap.appendChild(noteCard);
 
@@ -941,14 +1020,14 @@
       wrap.appendChild(el('div', { class: 'pml-error', text: state.errorMsg }));
     }
     if (sincronizacaoAtrasada()) {
-      wrap.appendChild(el('div', { class: 'pml-import-summary', style: 'border:1px solid #F0D8D2; color:#B23A2E; margin-bottom:16px;', text: '⚠ A sincronização automática não roda há mais de 2 dias. Confere se o script no seu computador ainda está sendo executado, ou sincronize manualmente na aba Importar.' }));
+      wrap.appendChild(el('div', { class: 'pml-import-summary', style: 'border:1px solid #F0D8D2; color:#B23A2E; margin-bottom:16px;', text: '⚠ A sincronização automática não roda há mais de 2 dias. Confere se a automação no GitHub Actions ainda está rodando, ou sincronize manualmente na aba Importar.' }));
     }
     renderMetrics(wrap);
     if (state.tab === 'geral') {
       renderGraficoVendas(wrap);
       var infoCard = el('div', { class: 'pml-card' }, [
         el('p', { class: 'pml-section-title', text: 'Como usar' }),
-        el('p', { style: 'font-size:14px; color:#6B6558; margin:0; line-height:1.6;', text: 'Cadastre seus produtos na aba Estoque com o custo e a quantidade — isso alimenta o valor em estoque acima. Lance suas vendas, compras e despesas na aba Financeiro para acompanhar o saldo do mês. Tudo fica salvo aqui, é só seu.' })
+        el('p', { style: 'font-size:14px; color:#6B6558; margin:0; line-height:1.6;', text: 'Cadastre seus produtos na aba Estoque com o custo e a quantidade — isso alimenta o valor em estoque acima. As vendas do Mercado Livre e da Shopee entram sozinhas (aba Importar → Sincronização automática). Lance compras e despesas manuais na aba Financeiro. Tudo fica salvo aqui, é só seu.' })
       ]);
       wrap.appendChild(infoCard);
     } else if (state.tab === 'estoque') {
