@@ -76,69 +76,6 @@
     return { novas: novas, ignoradas: ignoradas };
   }
 
-  function parseApiJson(texto, origemPrefix, labelFonte) {
-    origemPrefix = origemPrefix || 'api-ml-';
-    labelFonte = labelFonte || 'Mercado Livre';
-    var novas = [];
-    var ignoradas = 0;
-    var atualizadas = 0;
-    var dados;
-    try { dados = JSON.parse(texto); } catch (e) { return { novas: [], ignoradas: 0, atualizadas: 0, erro: true }; }
-    if (!Array.isArray(dados)) return { novas: [], ignoradas: 0, atualizadas: 0, erro: true };
-    dados.forEach(function (item, i) {
-      var tipo = item.tipo;
-      var valor = parseFloat(item.valor);
-      var dataRaw = String(item.data || '').trim();
-      if (!dataRaw || isNaN(valor) || ['venda', 'compra', 'despesa', 'devolucao', 'cancelamento', 'reembolso'].indexOf(tipo) === -1) {
-        ignoradas++; return;
-      }
-      var data = dataRaw.split('T')[0];
-      // Horario da venda (para o mapa de calor), no fuso de quem abre o painel
-      var quando = dataRaw.indexOf('T') !== -1 ? new Date(dataRaw) : null;
-      var temHora = quando && !isNaN(quando.getTime());
-      var origemId = origemPrefix + item.id + '-' + tipo;
-      var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
-      if (existente) {
-        var mudou = false;
-        if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || ((item.custos_ml || item.custos_shopee) && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
-          existente.itens = item.itens;
-          mudou = true;
-        }
-        if (tipo === 'venda' && item.custos_ml && JSON.stringify(existente.custosMl || null) !== JSON.stringify(item.custos_ml)) {
-          existente.custosMl = item.custos_ml;
-          mudou = true;
-        }
-        if (tipo === 'venda' && item.custos_shopee && JSON.stringify(existente.custosShopee || null) !== JSON.stringify(item.custos_shopee)) {
-          existente.custosShopee = item.custos_shopee;
-          mudou = true;
-        }
-        if (temHora && existente.hora === undefined) {
-          existente.hora = quando.getHours(); existente.dow = quando.getDay(); existente.dataHora = quando.toISOString();
-          mudou = true;
-        }
-        if (mudou) atualizadas++; else ignoradas++;
-        return;
-      }
-      var transacaoNova = {
-        id: uid(), origemId: origemId, data: data, tipo: tipo,
-        descricao: labelFonte + ' (API) - pedido ' + item.id,
-        valor: Math.abs(valor)
-      };
-      if (tipo === 'venda' && Array.isArray(item.itens)) {
-        transacaoNova.itens = item.itens;
-      }
-      if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }
-      if (tipo === 'venda' && item.custos_ml) {
-        transacaoNova.custosMl = item.custos_ml;
-      }
-      if (tipo === 'venda' && item.custos_shopee) {
-        transacaoNova.custosShopee = item.custos_shopee;
-      }
-      novas.push(transacaoNova);
-    });
-    return { novas: novas, ignoradas: ignoradas, atualizadas: atualizadas };
-  }
-
   function processarArquivo(file, onDone) {
     var nome = file.name.toLowerCase();
     if (nome.endsWith('.json')) {

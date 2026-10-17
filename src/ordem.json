@@ -7,6 +7,7 @@
  "src/js/03-base-ui.js",
  "src/js/04-estoque-financeiro.js",
  "src/js/05-importar.js",
+ "src/js/05b-ler-api.js",
  "src/js/06-tema-intro.js",
  "src/js/07-inicio.js",
  "src/js/08-calc3d-dados.js",

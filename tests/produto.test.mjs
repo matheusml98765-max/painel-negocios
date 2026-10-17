@@ -112,3 +112,17 @@ test('reposição usa o estoque real dos anúncios do ML e Ads junta ML e Shopee
   assert.equal(ads.linhas[0].aumentar, undefined);
   assert.equal(ads.linhas[0].decisao, 'aumentar'); // ACOS 12% < metade de 30%
 });
+
+test('venda que depois foi cancelada vira cancelamento (não conta duas vezes)', () => {
+  const p = painel();
+  const venda = [{ id: 'SP1', tipo: 'venda', valor: 20, data: dia(), itens: [{ item_id: 1, quantidade: 1, preco_unitario: 20 }], custos_shopee: { comissao: 4, liquido_recebido: 14 } }];
+  const r1 = p.parseApiJson(JSON.stringify(venda), 'api-shopee-', 'Shopee');
+  assert.equal(r1.novas.length, 1);
+  p.state.transacoes = r1.novas;
+  const r2 = p.parseApiJson(JSON.stringify([{ id: 'SP1', tipo: 'cancelamento', valor: 20, data: dia() }]), 'api-shopee-', 'Shopee');
+  assert.equal(r2.novas.length, 0);
+  assert.equal(r2.atualizadas, 1);
+  assert.equal(p.state.transacoes.length, 1);
+  assert.equal(p.state.transacoes[0].tipo, 'cancelamento');
+  assert.equal(p.state.transacoes[0].custosShopee, undefined);
+});
