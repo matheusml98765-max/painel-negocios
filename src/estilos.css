@@ -290,6 +290,14 @@
   .dev-motivo { display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr auto; gap: 12px; align-items: center; padding: 6px 0; font-size: 14px; color: var(--ink); }
   .dev-motivo .pml-barra { margin: 0; }
   @media (max-width: 560px) { .dev-motivo { grid-template-columns: 1fr auto; } .dev-motivo .pml-barra { grid-column: 1 / -1; grid-row: 2; } }
+  .tarefa { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .tarefa-check { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; border: 2px solid var(--accent); background: transparent; color: var(--surface); font-weight: 800; cursor: pointer; }
+  .tarefa.feita .tarefa-check { background: var(--good); border-color: var(--good); }
+  .tarefa-texto { flex: 1; min-width: 0; }
+  .tarefa-titulo { font-size: 15px; color: var(--ink); font-weight: 600; }
+  .tarefa.feita .tarefa-titulo { text-decoration: line-through; color: var(--muted); font-weight: 500; }
+  .tarefa-x { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 6px; }
+  .tarefa-x:hover { color: var(--bad); }
   @media print {
     .pml-tabs, .pml-header-acoes, .rel-acoes, #intro, .pml-import-summary { display: none !important; }
     .pml-card, .pml-metric { box-shadow: none !important; break-inside: avoid; }

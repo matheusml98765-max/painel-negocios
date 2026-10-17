@@ -144,3 +144,20 @@ test('devoluções: conta quebradas, perda em peças e tarifa de devolução do 
   const g = p.calcLucroPorProduto(30).linhas.find((x) => x.itemId === 'MLB1');
   perto(g.lucro, 80 - 50 - 9.93, 'lucro já sem a tarifa de devolução');
 });
+
+test('luz e insumos pelas vendas de peças 3D', () => {
+  const p = painel();
+  const c = p.getCalc3d();
+  Object.assign(c, { kwh: 0.8, perdaPct: 10, impressoras: [{ id: 'a', watts: 100, preco: 3000, vidaHoras: 5000 }],
+    filamentos: [{ tipo: 'PETG', kg: 1, preco: 70, frete: 0 }],
+    embalagens: [{ nome: 'Saco', qtd: 100, preco: 10, frete: 0, data: '2020-01-01' }, { nome: 'Saco', qtd: 50, preco: 5, frete: 0, data: dia() }],
+    produtos: [{ id: 'x', nome: 'Papel', tipo: 'PETG', gramas: 90, horas: 4, porPlaca: 1, impressoraId: 'a', insumos: [{ nome: 'Saco', qtd: 1 }], anuncios: 'MLB1, 123' }] });
+  c.estoqueInsumos = { Saco: { qtd: 20, data: dia(-1) } };
+  p.state.transacoes = [vendaMl(dia(), 3)];
+  const r = p.calcConsumo3d(dia(-30), dia());
+  perto(r.horas, 3 * 4 * 1.1, 'horas com perdas');
+  perto(r.kwh, 1.32, 'kWh');
+  perto(r.luz, 1.056, 'R$ de luz');
+  const est = p.calcEstoqueInsumos().find((x) => x.nome === 'Saco');
+  assert.equal(est.sobra, 20 + 50 - 3); // contagem + compra depois - vendas
+});

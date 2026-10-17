@@ -178,6 +178,7 @@
       }
       await sincronizarFaturamento();
       await sincronizarAnunciosMl();
+      await sincronizarTarefasCpf();
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
       state.errorMsg = '';

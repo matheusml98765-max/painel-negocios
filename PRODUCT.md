@@ -23,6 +23,8 @@ Quem vende no Mercado Livre e na Shopee não sabe quanto lucra em cada produto. 
 - Relatório do mês: nota da loja (com o motivo de cada ponto perdido), problemas e oportunidades em R$, plano para 30 dias e PDF.
 - Avisos no Telegram (resumo às 8h, automação parada, venda grande), feitos pela automação.
 - Devoluções, cancelamentos e perdas (ML e Shopee): motivo, peças que chegaram quebradas e a perda, tarifas de devolução do ML (descontadas do lucro) e ajustes de estoque no Full.
+- Calculadora 3D: luz das impressoras por mês e estoque de insumos, calculados pelas peças vendidas.
+- Abas Tarefas (riscar/excluir) e CPF (entradas e saídas pessoais), que o Claude preenche pelo chat.
 - Tudo atualizado sozinho de hora em hora.
 
 ## Critérios de "pronto" para uma funcionalidade

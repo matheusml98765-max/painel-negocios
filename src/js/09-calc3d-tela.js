@@ -188,5 +188,5 @@
       });
       wrap.appendChild(sim);
     }
+    renderLuzInsumosCards(wrap);
   }
-

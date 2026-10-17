@@ -19,6 +19,8 @@
  "src/js/15-produto-tela.js",
  "src/js/16-relatorio.js",
  "src/js/17-devolucoes.js",
+ "src/js/18-luz-insumos.js",
+ "src/js/19-tarefas-cpf.js",
  "src/js/12-render.js",
  "src/fim.html"
 ]
