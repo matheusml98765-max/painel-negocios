@@ -310,3 +310,9 @@
   .aviso-texto { flex: 1 1 260px; }
   .aviso-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
   .aviso-acoes .pml-btn { padding: 5px 10px; font-size: 12px; }
+
+  .conq-frase { text-align: center; padding: 28px 20px; }
+  .conq-frase-texto { font-size: 22px; line-height: 1.4; font-weight: 700; color: var(--ink); margin: 6px auto 0; max-width: 720px; }
+  .conq-item { display: flex; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .conq-item:first-of-type { border-top: 0; }
+  .conq-icone { font-size: 26px; width: 34px; text-align: center; }
