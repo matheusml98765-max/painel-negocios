@@ -310,3 +310,16 @@ test('contagem vale para o fim do dia: vendas do dia não saem de novo e compra 
   perto(f.sobra, 596, 'contagem + compra do dia');
   perto(f.fila[0].unit, 0.1805, 'gasta primeiro a caixa antiga');
 });
+
+test('contagem com a origem de cada parte (450 do ML + 50 da Shopee)', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [
+    { nome: 'Saco', data: '2026-08-07', qtd: 500, preco: 84.43, frete: 0 },
+    { nome: 'Saco', data: '2026-10-07', qtd: 500, preco: 69.18, frete: 0 },
+  ];
+  c.estoqueInsumos = { Saco: { qtd: 500, data: '2026-10-17', lotes: [{ data: '2026-10-07', qtd: 450 }, { data: '2026-08-07', qtd: 50 }] } };
+  const f = p.filaFifo('emb:Saco');
+  assert.equal(f.fila[0].data, '2026-08-07'); perto(f.fila[0].qtd, 50, 'shopee primeiro');
+  perto(f.fila[1].qtd, 450, 'ml depois'); perto(f.sobra, 500, 'total');
+});

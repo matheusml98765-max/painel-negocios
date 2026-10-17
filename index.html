@@ -4259,10 +4259,10 @@
     var est = getCalc3d().estoqueInsumos || {};
     if (chave.indexOf('fil:') === 0) {
       var e = est[nomeFilamentoEstoque(chave.slice(4))];
-      return e ? { qtd: num(e.qtd) * 1000, data: e.data } : null;
+      return e ? { qtd: num(e.qtd) * 1000, data: e.data, lotes: e.lotes } : null;
     }
     var x = est[chave.slice(4)];
-    return x ? { qtd: num(x.qtd), data: x.data } : null;
+    return x ? { qtd: num(x.qtd), data: x.data, lotes: x.lotes } : null;
   }
 
   // Monta a fila de um item: preco usado em cada dia de venda e o que sobra agora, lote a lote
@@ -4272,12 +4272,22 @@
     if (!cont || !lotes.length) return null;
     // A contagem vale para o fim do dia: as vendas daquele dia ja sairam dela, e uma compra
   // feita no mesmo dia ainda nao chegou (entra depois). O que sobrou e das compras anteriores.
+    var fator = chave.indexOf('fil:') === 0 ? 1000 : 1;
     var fila = [], falta = cont.qtd;
-    lotes.filter(function (l) { return l.data < cont.data; }).reverse().forEach(function (l) {
+    // Contagem que diz de qual compra e cada parte (ex.: 450 do ML de 07/10 + 50 da Shopee de 07/08)
+    if (Array.isArray(cont.lotes) && cont.lotes.length) {
+      cont.lotes.slice().sort(function (a, b) { return a.data < b.data ? -1 : 1; }).forEach(function (x) {
+        var l = lotes.find(function (y) { return y.data === x.data; });
+        if (l && num(x.qtd) > 0) { fila.push({ data: l.data, qtd: num(x.qtd) * fator, unit: l.unit }); falta -= num(x.qtd) * fator; }
+      });
+    }
+    var usados = fila.map(function (f) { return f.data; });
+    lotes.filter(function (l) { return l.data < cont.data && usados.indexOf(l.data) === -1; }).reverse().forEach(function (l) {
       if (falta <= 0) return;
       var q = Math.min(l.qtd, falta); falta -= q;
-      fila.unshift({ data: l.data, qtd: q, unit: l.unit });
+      fila.push({ data: l.data, qtd: q, unit: l.unit });
     });
+    fila.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
     if (falta > 0) fila.unshift({ data: cont.data, qtd: falta, unit: (lotes.filter(function (l) { return l.data < cont.data; })[0] || lotes[0]).unit, semCompra: true });
     var depois = lotes.filter(function (l) { return l.data >= cont.data; });
     var uso = usoPorDia(chave);
