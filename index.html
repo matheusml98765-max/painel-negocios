@@ -2121,13 +2121,15 @@
       ]));
       var ins = el('div', { style: 'margin:6px 0 4px;' }, [el('div', { class: 'pml-metric-label', style: 'margin-bottom:6px;', text: 'Embalagem e insumos usados por peça' })]);
       p.insumos.forEach(function (it) {
-        var sel = el('select', { style: 'padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field); font-family:inherit;' }, nomesEmbalagem().map(function (n) { var o = el('option', { value: n, text: n }); if (it.nome === n) o.setAttribute('selected', ''); return o; }));
+        var nomesSel = nomesEmbalagem().indexOf(it.nome) >= 0 ? nomesEmbalagem() : [it.nome].concat(nomesEmbalagem());
+        var semPreco = nomesEmbalagem().indexOf(it.nome) < 0;
+        var sel = el('select', { style: 'padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field); font-family:inherit;' }, nomesSel.map(function (n) { var o = el('option', { value: n, text: n }); if (it.nome === n) o.setAttribute('selected', ''); return o; }));
         sel.addEventListener('change', function () { it.nome = sel.value; salvarERender(); });
         var q = el('input', { type: 'number', step: '0.1', value: it.qtd, style: 'width:80px; padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field);' });
         q.addEventListener('change', function () { it.qtd = num(q.value); salvarERender(); });
         ins.appendChild(el('div', { style: 'display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;' }, [
           sel, el('span', { class: 'pml-margin', text: '×' }), q,
-          el('span', { class: 'pml-margin', text: '= ' + fmtMoney(custoEmbalagem(it.nome) * num(it.qtd)) }),
+          semPreco ? el('span', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta o preço: cadastre a compra na seção 3' }) : el('span', { class: 'pml-margin', text: '= ' + fmtMoney(custoEmbalagem(it.nome) * num(it.qtd)) }),
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));
       });
@@ -2137,6 +2139,8 @@
         ins.appendChild(el('span', { class: 'pml-margin', text: 'Cadastre embalagens e insumos na seção 3 para usar aqui.' }));
       }
       bloco.appendChild(ins);
+      var faltaPreco = p.insumos.filter(function (it) { return num(it.qtd) > 0 && nomesEmbalagem().indexOf(it.nome) < 0; }).map(function (it) { return it.nome; });
+      if (faltaPreco.length) bloco.appendChild(el('div', { class: 'pml-margin', style: 'color:var(--warn); margin:4px 0;', text: 'O custo ainda não inclui: ' + faltaPreco.join(', ') + '. Falta cadastrar o preço.' }));
       var partes = [['Filamento', custo.material], ['Luz', custo.energia], ['Desgaste', custo.desgaste], ['Manutenção', custo.manutencao], ['Perdas', custo.perda], ['Embalagem e insumos', custo.embalagem], ['Extras', custo.extras]];
       bloco.appendChild(el('div', { class: 'pml-margin', style: 'margin-top:4px; line-height:1.8;' }, partes.map(function (x) {
         return el('span', { style: 'margin-right:14px; white-space:nowrap;', text: x[0] + ': ' + fmtMoney(x[1]) });
