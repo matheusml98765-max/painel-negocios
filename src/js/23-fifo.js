@@ -65,17 +65,18 @@
     var cont = contagemFifo(chave);
     var lotes = lotesFifo(chave).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
     if (!cont || !lotes.length) return null;
-    // Na contagem, o que sobrou e das compras mais recentes ate aquele dia
+    // A contagem vale para o fim do dia: as vendas daquele dia ja sairam dela, e uma compra
+  // feita no mesmo dia ainda nao chegou (entra depois). O que sobrou e das compras anteriores.
     var fila = [], falta = cont.qtd;
-    lotes.filter(function (l) { return l.data <= cont.data; }).reverse().forEach(function (l) {
+    lotes.filter(function (l) { return l.data < cont.data; }).reverse().forEach(function (l) {
       if (falta <= 0) return;
       var q = Math.min(l.qtd, falta); falta -= q;
       fila.unshift({ data: l.data, qtd: q, unit: l.unit });
     });
-    if (falta > 0) fila.unshift({ data: cont.data, qtd: falta, unit: (lotes.filter(function (l) { return l.data <= cont.data; })[0] || lotes[0]).unit, semCompra: true });
-    var depois = lotes.filter(function (l) { return l.data > cont.data; });
+    if (falta > 0) fila.unshift({ data: cont.data, qtd: falta, unit: (lotes.filter(function (l) { return l.data < cont.data; })[0] || lotes[0]).unit, semCompra: true });
+    var depois = lotes.filter(function (l) { return l.data >= cont.data; });
     var uso = usoPorDia(chave);
-    var dias = Object.keys(uso).filter(function (d) { return d >= cont.data; }).concat(depois.map(function (l) { return l.data; }));
+    var dias = Object.keys(uso).filter(function (d) { return d > cont.data; }).concat(depois.map(function (l) { return l.data; }));
     dias = dias.filter(function (d, i) { return dias.indexOf(d) === i; }).sort();
     var precoDia = {}, faltou = 0, ultimo = lotes[lotes.length - 1].unit;
     dias.forEach(function (d) {

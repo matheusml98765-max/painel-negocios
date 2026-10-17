@@ -294,3 +294,19 @@ test('falha de impressão: gramas × % onde parou, entra no lucro e no estoque d
   const r = p.falhasNoPeriodo('2026-10-01', '2026-10-31');
   perto(r.total, f.total, 'mês');
 });
+
+test('contagem vale para o fim do dia: vendas do dia não saem de novo e compra do dia entra depois', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.perdaPct = 0;
+  c.embalagens = [
+    { nome: 'Par', data: '2026-09-11', qtd: 200, preco: 36.1, frete: 0 },
+    { nome: 'Par', data: '2026-10-17', qtd: 500, preco: 70, frete: 0 },
+  ];
+  c.estoqueInsumos = { Par: { qtd: 96, data: '2026-10-17' } };
+  c.produtos = [{ id: 'x', nome: 'Papel', tipo: 'PETG', gramas: 10, horas: 1, anuncios: 'MLB1', insumos: [{ nome: 'Par', qtd: 2 }] }];
+  p.state.transacoes = [{ tipo: 'venda', data: '2026-10-17', valor: 30, itens: [{ item_id: 'MLB1', quantidade: 1 }] }];
+  const f = p.filaFifo('emb:Par');
+  perto(f.sobra, 596, 'contagem + compra do dia');
+  perto(f.fila[0].unit, 0.1805, 'gasta primeiro a caixa antiga');
+});

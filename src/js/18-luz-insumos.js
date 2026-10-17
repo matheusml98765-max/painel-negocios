@@ -62,8 +62,8 @@
       var linha = { nome: it.nome, contado: !!cont, porDia: u30 / 30, semPreco: !lotesFifo(it.chave).length };
       if (cont) {
         var f = filaFifo(it.chave);
-        var usado = Object.keys(uso).reduce(function (s, d) { return s + (d >= cont.data ? uso[d] : 0); }, 0) / it.fator;
-        var comprado = lotesFifo(it.chave).filter(function (l) { return l.data > cont.data; }).reduce(function (s, l) { return s + l.qtd; }, 0) / it.fator;
+        var usado = Object.keys(uso).reduce(function (s, d) { return s + (d > cont.data ? uso[d] : 0); }, 0) / it.fator;
+        var comprado = lotesFifo(it.chave).filter(function (l) { return l.data >= cont.data; }).reduce(function (s, l) { return s + l.qtd; }, 0) / it.fator;
         linha.sobra = num(cont.qtd) + comprado - usado;
         linha.comprado = comprado; linha.usado = usado; linha.desde = cont.data;
         linha.dias = linha.porDia > 0 ? Math.max(0, linha.sobra) / linha.porDia : null;
@@ -73,6 +73,7 @@
     }).sort(function (a, b) { return (a.dias === undefined || a.dias === null ? 1e9 : a.dias) - (b.dias === undefined || b.dias === null ? 1e9 : b.dias); });
   }
 
+  function fmtUnitario(v) { return v > 0 && v < 0.1 ? 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : fmtMoney(v); }
   function fmtQtd(n) { return (Math.round(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 }); }
 
   function renderLuzInsumosCards(wrap) {
@@ -130,7 +131,7 @@
         salvarCalc3d(); render();
       } });
       t2.appendChild(el('tr', { class: l.dias !== undefined && l.dias !== null && l.dias <= 10 ? 'pml-row-alerta' : '' }, [
-        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + fmtQtd(l.comprado) + ' comprados · −' + fmtQtd(l.usado) + ' usados nas vendas' + (l.loteAtual ? ' · usando agora a compra de ' + (l.loteAtual.semCompra ? 'antes do cadastro' : l.loteAtual.data.split('-').reverse().join('/')) + ' (' + fmtMoney(l.loteAtual.unit) + ' cada)' : '') }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' }), l.semPreco ? el('div', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta cadastrar a compra (preço)' }) : null].filter(Boolean)),
+        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + fmtQtd(l.comprado) + ' comprados · −' + fmtQtd(l.usado) + ' usados nas vendas' + (l.loteAtual ? ' · usando agora a compra de ' + (l.loteAtual.semCompra ? 'antes do cadastro' : l.loteAtual.data.split('-').reverse().join('/')) + ' (' + fmtUnitario(l.loteAtual.unit) + ' cada)' : '') }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' }), l.semPreco ? el('div', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta cadastrar a compra (preço)' }) : null].filter(Boolean)),
         el('td', { class: 'num', text: l.porDia ? l.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
         el('td', { class: 'num', style: 'font-weight:700;', text: l.contado ? fmtQtd(l.sobra) : '—' }),
         el('td', { class: 'num', text: l.dias === undefined ? '—' : (l.dias === null ? 'sem uso' : Math.max(0, Math.round(l.dias)) + ' dias') }),
