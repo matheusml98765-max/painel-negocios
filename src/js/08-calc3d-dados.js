@@ -43,33 +43,40 @@
 
   function num(v) { var n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; }
 
-  // Preco atual, nao o historico: o vendedor vai barateando as compras, entao vale o que ele
-  // paga hoje. Usa as compras feitas ate 30 dias antes da compra mais recente (com frete).
-  // Lotes sem data entram todos (cadastro antigo).
-  function lotesAtuais(lotes) {
-    var datas = lotes.map(function (l) { return l.data || ''; }).filter(Boolean).sort();
-    if (!datas.length) return lotes;
-    var ultima = new Date(datas[datas.length - 1] + 'T12:00:00');
-    var corte = new Date(ultima.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-    return lotes.filter(function (l) { return l.data && l.data >= corte; });
+  // Preco das compras do periodo, nao a media de todo o historico: o vendedor vai barateando
+  // as compras. Para uma data (a da venda), vale a compra mais recente feita ate aquele dia e
+  // as outras feitas ate 30 dias antes dela. Sem data: o preco de hoje. Venda anterior a
+  // primeira compra cadastrada usa a primeira compra. Lotes sem data entram todos.
+  function lotesDoPeriodo(lotes, dataRef) {
+    var comData = lotes.filter(function (l) { return l.data; });
+    if (!comData.length) return lotes;
+    var ate = comData.filter(function (l) { return !dataRef || l.data <= dataRef; });
+    if (!ate.length) {
+      var primeira = comData.map(function (l) { return l.data; }).sort()[0];
+      ate = comData.filter(function (l) { return l.data <= primeira; });
+    }
+    var ultima = ate.map(function (l) { return l.data; }).sort().pop();
+    var corte = new Date(new Date(ultima + 'T12:00:00').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    return ate.filter(function (l) { return l.data >= corte; });
+  }
+  var lotesAtuais = lotesDoPeriodo;
+
+  function precoMedioLotes(lotes, campoQtd, fator) {
+    var qtd = lotes.reduce(function (s, l) { return s + num(l[campoQtd]) * fator; }, 0);
+    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
+    return qtd > 0 ? pago / qtd : 0;
   }
 
-  function custoGrama(tipo) {
+  function custoGrama(tipo, dataRef) {
     var c = getCalc3d();
     var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
     if (!lotes.length) lotes = c.filamentos;
-    lotes = lotesAtuais(lotes);
-    var gramas = lotes.reduce(function (s, l) { return s + num(l.kg) * 1000; }, 0);
-    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
-    return gramas > 0 ? pago / gramas : 0;
+    return precoMedioLotes(lotesDoPeriodo(lotes, dataRef), 'kg', 1000);
   }
 
-  function custoEmbalagem(nome) {
+  function custoEmbalagem(nome, dataRef) {
     var c = getCalc3d();
-    var lotes = lotesAtuais(c.embalagens.filter(function (l) { return l.nome === nome; }));
-    var qtd = lotes.reduce(function (s, l) { return s + num(l.qtd); }, 0);
-    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
-    return qtd > 0 ? pago / qtd : 0;
+    return precoMedioLotes(lotesDoPeriodo(c.embalagens.filter(function (l) { return l.nome === nome; }), dataRef), 'qtd', 1);
   }
 
   function tiposFilamento() {
@@ -85,18 +92,18 @@
     return Object.keys(t);
   }
 
-  function custoPeca3d(p) {
+  function custoPeca3d(p, dataRef) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
     var porPlaca = Math.max(1, num(p.porPlaca) || 1);
     var horas = num(p.horas);
-    var material = num(p.gramas) * custoGrama(p.tipo);
+    var material = num(p.gramas) * custoGrama(p.tipo, dataRef);
     var energia = horas * (num(imp.watts) / 1000) * num(c.kwh);
     var desgaste = horas * (num(imp.vidaHoras) > 0 ? num(imp.preco) / num(imp.vidaHoras) : 0);
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome) * num(i.qtd); }, 0);
+    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -106,13 +113,13 @@
   }
 
   // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro real)
-  function custo3dDoAnuncio(itemId) {
+  function custo3dDoAnuncio(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
     var p = state.calc3d.produtos.find(function (x) {
       return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
     });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p).total;
+    return custoPeca3d(p, dataRef).total;
   }
 

@@ -175,3 +175,39 @@ test('mapa de calor conta pedidos por dia da semana e hora e ignora vendas antig
   const f = p.melhorFaixa(m.porHora);
   assert.equal(f.pedidos, 2);
 });
+
+test('venda usa o preço das compras da época dela, não o de hoje', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.filamentos = [
+    { tipo: 'PETG', data: '2026-07-10', kg: 5, preco: 400, frete: 0 },  // R$ 80/kg
+    { tipo: 'PETG', data: '2026-10-05', kg: 10, preco: 600, frete: 0 }, // R$ 60/kg
+  ];
+  perto(p.custoGrama('PETG', '2026-07-20') * 1000, 80, 'julho');
+  perto(p.custoGrama('PETG', '2026-10-15') * 1000, 60, 'outubro');
+  perto(p.custoGrama('PETG') * 1000, 60, 'hoje');
+  perto(p.custoGrama('PETG', '2026-06-01') * 1000, 80, 'antes da primeira compra');
+});
+
+test('compras: cada compra comparada com o preço de antes, por semana e por mês', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.filamentos = [
+    { tipo: 'PETG', data: '2026-10-02', kg: 10, preco: 700, frete: 0 }, // 70/kg, primeira
+    { tipo: 'PETG', data: '2026-10-09', kg: 10, preco: 650, frete: 0 }, // 65/kg: 5/kg a menos = R$ 50
+  ];
+  c.embalagens = [
+    { nome: 'Caixa', data: '2026-10-01', qtd: 50, preco: 50, frete: 0 },
+    { nome: 'Caixa', data: '2026-10-08', qtd: 50, preco: 55, frete: 0 }, // 0,10 a mais = R$ 5
+  ];
+  const r = p.compararCompras();
+  const fil = r.linhas.find((x) => x.data === '2026-10-09');
+  perto(fil.difUnit, -5, 'filamento R$/kg');
+  perto(fil.difTotal, -50, 'filamento total');
+  assert.equal(r.linhas.find((x) => x.data === '2026-10-02').ref, null);
+  perto(r.linhas.find((x) => x.data === '2026-10-08').difTotal, 5, 'caixa');
+  assert.equal(p.inicioSemana('2026-10-09'), '2026-10-05');
+  const sem = r.semanas.find((s) => s.mes === '2026-10-05');
+  perto(sem.aMenos, 50, 'economia da semana'); perto(sem.aMais, 5, 'a mais na semana');
+  assert.equal(r.meses[0].compras, 4);
+});

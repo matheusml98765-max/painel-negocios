@@ -1933,33 +1933,40 @@
 
   function num(v) { var n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; }
 
-  // Preco atual, nao o historico: o vendedor vai barateando as compras, entao vale o que ele
-  // paga hoje. Usa as compras feitas ate 30 dias antes da compra mais recente (com frete).
-  // Lotes sem data entram todos (cadastro antigo).
-  function lotesAtuais(lotes) {
-    var datas = lotes.map(function (l) { return l.data || ''; }).filter(Boolean).sort();
-    if (!datas.length) return lotes;
-    var ultima = new Date(datas[datas.length - 1] + 'T12:00:00');
-    var corte = new Date(ultima.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-    return lotes.filter(function (l) { return l.data && l.data >= corte; });
+  // Preco das compras do periodo, nao a media de todo o historico: o vendedor vai barateando
+  // as compras. Para uma data (a da venda), vale a compra mais recente feita ate aquele dia e
+  // as outras feitas ate 30 dias antes dela. Sem data: o preco de hoje. Venda anterior a
+  // primeira compra cadastrada usa a primeira compra. Lotes sem data entram todos.
+  function lotesDoPeriodo(lotes, dataRef) {
+    var comData = lotes.filter(function (l) { return l.data; });
+    if (!comData.length) return lotes;
+    var ate = comData.filter(function (l) { return !dataRef || l.data <= dataRef; });
+    if (!ate.length) {
+      var primeira = comData.map(function (l) { return l.data; }).sort()[0];
+      ate = comData.filter(function (l) { return l.data <= primeira; });
+    }
+    var ultima = ate.map(function (l) { return l.data; }).sort().pop();
+    var corte = new Date(new Date(ultima + 'T12:00:00').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    return ate.filter(function (l) { return l.data >= corte; });
+  }
+  var lotesAtuais = lotesDoPeriodo;
+
+  function precoMedioLotes(lotes, campoQtd, fator) {
+    var qtd = lotes.reduce(function (s, l) { return s + num(l[campoQtd]) * fator; }, 0);
+    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
+    return qtd > 0 ? pago / qtd : 0;
   }
 
-  function custoGrama(tipo) {
+  function custoGrama(tipo, dataRef) {
     var c = getCalc3d();
     var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
     if (!lotes.length) lotes = c.filamentos;
-    lotes = lotesAtuais(lotes);
-    var gramas = lotes.reduce(function (s, l) { return s + num(l.kg) * 1000; }, 0);
-    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
-    return gramas > 0 ? pago / gramas : 0;
+    return precoMedioLotes(lotesDoPeriodo(lotes, dataRef), 'kg', 1000);
   }
 
-  function custoEmbalagem(nome) {
+  function custoEmbalagem(nome, dataRef) {
     var c = getCalc3d();
-    var lotes = lotesAtuais(c.embalagens.filter(function (l) { return l.nome === nome; }));
-    var qtd = lotes.reduce(function (s, l) { return s + num(l.qtd); }, 0);
-    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
-    return qtd > 0 ? pago / qtd : 0;
+    return precoMedioLotes(lotesDoPeriodo(c.embalagens.filter(function (l) { return l.nome === nome; }), dataRef), 'qtd', 1);
   }
 
   function tiposFilamento() {
@@ -1975,18 +1982,18 @@
     return Object.keys(t);
   }
 
-  function custoPeca3d(p) {
+  function custoPeca3d(p, dataRef) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
     var porPlaca = Math.max(1, num(p.porPlaca) || 1);
     var horas = num(p.horas);
-    var material = num(p.gramas) * custoGrama(p.tipo);
+    var material = num(p.gramas) * custoGrama(p.tipo, dataRef);
     var energia = horas * (num(imp.watts) / 1000) * num(c.kwh);
     var desgaste = horas * (num(imp.vidaHoras) > 0 ? num(imp.preco) / num(imp.vidaHoras) : 0);
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome) * num(i.qtd); }, 0);
+    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -1996,14 +2003,14 @@
   }
 
   // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro real)
-  function custo3dDoAnuncio(itemId) {
+  function custo3dDoAnuncio(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
     var p = state.calc3d.produtos.find(function (x) {
       return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
     });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p).total;
+    return custoPeca3d(p, dataRef).total;
   }
 
   function renderCalc3dTab(wrap) {
@@ -2069,7 +2076,7 @@
     }
 
     var resumoFil = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;' }, tiposFilamento().map(function (t) {
-      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ' (preço atual, compras dos últimos 30 dias): ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
+      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ' (preço de hoje: compras dos últimos 30 dias): ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
     }));
     wrap.appendChild(cardLotes('2. Remessas de filamento', c.filamentos, [
       { titulo: 'Data', chave: 'data', largura: 130 },
@@ -2201,6 +2208,7 @@
       wrap.appendChild(sim);
     }
     renderLuzInsumosCards(wrap);
+    renderComprasCard(wrap);
   }
   // ===================== LUCRO REAL =====================
 
@@ -2221,9 +2229,10 @@
     return (n * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
   }
 
-  function custoDoItem(itemId) {
+  // dataRef (opcional): data da venda, para a peca 3D usar o preco das compras daquela epoca.
+  function custoDoItem(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
-    var c3d = custo3dDoAnuncio(id);
+    var c3d = custo3dDoAnuncio(id, dataRef);
     if (c3d !== null) return { valor: c3d, fonte: '3d' };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
@@ -2293,8 +2302,10 @@
         var qtd = Number(i.quantidade) || 1;
         var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
         var id = String(i.item_id || 'sem-id');
-        var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0 });
+        var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0, custoAcum: 0, semCusto: false });
         g.unidades += qtd;
+        var cv = custoDoItem(id, t.data);
+        if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
         g.vendas += 1;
         g.receita += valor * parte;
         g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
@@ -2308,7 +2319,8 @@
     var linhas = Object.keys(grupos).map(function (k) {
       var g = grupos[k];
       g.tarifasDevolucao = tarifasDev[String(g.itemId).toUpperCase()] || 0;
-      var custo = custoDoItem(g.itemId);
+      // Custo de cada venda pelo preco da epoca dela; custoUnit e a media do periodo.
+      var custo = g.semCusto ? null : { valor: g.unidades ? g.custoAcum / g.unidades : 0, fonte: g.fonteVenda };
       g.custoUnit = custo ? custo.valor : null;
       g.fonteCusto = custo ? custo.fonte : null;
       g.imposto = g.receita * imposto;
@@ -3778,6 +3790,150 @@
       lc.appendChild(el('div', { class: 'pml-scroll' }, [t]));
     }
     wrap.appendChild(lc);
+  }
+  // ===================== COMPRAS: PAGOU A MAIS OU A MENOS =====================
+  // Cada compra (filamento por tipo, insumo por nome) comparada com o preco que valia
+  // antes dela (compras dos 30 dias anteriores, a mesma regra usada no custo das vendas).
+
+  function compararCompras() {
+    var c = getCalc3d();
+    var linhas = [];
+    function grupo(lotes, chave, campoQtd, unidade) {
+      var porChave = {};
+      lotes.forEach(function (l) { var k = chave(l); if (k) (porChave[k] = porChave[k] || []).push(l); });
+      Object.keys(porChave).forEach(function (k) {
+        var lista = porChave[k].filter(function (l) { return l.data && num(l[campoQtd]) > 0; })
+          .sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+        lista.forEach(function (l, i) {
+          var qtd = num(l[campoQtd]);
+          var unit = (num(l.preco) + num(l.frete)) / qtd;
+          var antes = lista.slice(0, i).filter(function (x) { return x.data < l.data; });
+          var ref = antes.length ? precoMedioLotes(lotesDoPeriodo(antes, null), campoQtd, 1) : null;
+          linhas.push({
+            data: l.data, item: k, descricao: l.descricao || l.nome || k, qtd: qtd, unidade: unidade,
+            pago: num(l.preco) + num(l.frete), unit: unit, ref: ref,
+            difUnit: ref === null ? null : unit - ref,
+            difTotal: ref === null ? null : (unit - ref) * qtd
+          });
+        });
+      });
+    }
+    grupo(c.filamentos, function (l) { return 'Filamento ' + (l.tipo || '').toUpperCase(); }, 'kg', 'kg');
+    grupo(c.embalagens, function (l) { return l.nome; }, 'qtd', 'un');
+    linhas.sort(function (a, b) { return a.data < b.data ? 1 : a.data > b.data ? -1 : 0; });
+
+    function agrupar(chave) {
+      var g = {};
+      linhas.forEach(function (x) {
+        var k = chave(x.data);
+        var r = g[k] || (g[k] = { mes: k, gasto: 0, aMais: 0, aMenos: 0, compras: 0, itens: [] });
+        r.gasto += x.pago; r.compras += 1; r.itens.push(x);
+        if (x.difTotal !== null) { if (x.difTotal > 0) r.aMais += x.difTotal; else r.aMenos += -x.difTotal; }
+      });
+      return Object.keys(g).sort().reverse().map(function (k) { return g[k]; });
+    }
+    return {
+      linhas: linhas,
+      meses: agrupar(function (d) { return d.slice(0, 7); }),
+      semanas: agrupar(inicioSemana)
+    };
+  }
+
+  // Segunda-feira da semana da data (AAAA-MM-DD)
+  function inicioSemana(data) {
+    var d = new Date(data + 'T12:00:00');
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function nomeSemana(seg) {
+    var fim = new Date(seg + 'T12:00:00'); fim.setDate(fim.getDate() + 6);
+    var f = function (x) { return x.slice(8, 10) + '/' + x.slice(5, 7); };
+    var hoje = inicioSemana(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+    var ant = new Date(hoje + 'T12:00:00'); ant.setDate(ant.getDate() - 7);
+    var rot = seg === hoje ? 'Esta semana' : seg === ant.toISOString().slice(0, 10) ? 'Semana passada' : 'Semana';
+    return rot + ' (' + f(seg) + ' a ' + f(fim.toISOString().slice(0, 10)) + ')';
+  }
+
+  function nomeMes(m) {
+    var n = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    return n[Number(m.slice(5, 7)) - 1] + '/' + m.slice(0, 4);
+  }
+
+  function renderComprasCard(wrap) {
+    var r = compararCompras();
+    var card = el('div', { class: 'pml-card' }, [
+      el('div', { class: 'pml-card-title', text: 'Suas compras: pagou a mais ou a menos' }),
+      el('p', { class: 'pml-margin', style: 'margin:0 0 10px;', text: 'Cada compra comparada com o preço que você pagava antes dela (compras dos 30 dias anteriores do mesmo item). O custo de cada venda usa o preço das compras da época dela.' })
+    ]);
+    if (!r.linhas.length) {
+      card.appendChild(el('p', { class: 'pml-margin', text: 'Cadastre as compras de filamento e insumos acima para ver a comparação.' }));
+      wrap.appendChild(card);
+      return;
+    }
+    var cor = corDif, sinal = sinalDif;
+
+    var visao = state.comprasVisao || 'semana';
+    var grupos = visao === 'semana' ? r.semanas : r.meses;
+    card.appendChild(el('div', { style: 'display:flex; gap:6px; margin-bottom:10px;' }, [['semana', 'Por semana'], ['mes', 'Por mês']].map(function (o) {
+      return el('button', { class: 'pml-btn' + (visao === o[0] ? '' : ' secondary'), text: o[1], onclick: function () { state.comprasVisao = o[0]; render(); } });
+    })));
+
+    // Ultima semana (ou mes) com compras: cada compra e a comparacao dela
+    var atual = grupos[0], anterior = grupos[1];
+    var saldoAtual = atual.aMais - atual.aMenos;
+    var frase = (visao === 'semana' ? nomeSemana(atual.mes) : nomeMes(atual.mes)) + ': ' + atual.compras + (atual.compras === 1 ? ' compra, ' : ' compras, ') + fmtMoney(atual.gasto) + '. ' +
+      (atual.aMais || atual.aMenos ? (saldoAtual > 0.005 ? 'Pagou ' + fmtMoney(saldoAtual) + ' a mais que antes.' : saldoAtual < -0.005 ? 'Saiu ' + fmtMoney(-saldoAtual) + ' mais barato que antes.' : 'Mesmo preço de antes.') : 'Sem compra anterior para comparar.');
+    if (anterior) {
+      var saldoAnt = anterior.aMais - anterior.aMenos;
+      frase += ' ' + (visao === 'semana' ? 'Na semana anterior com compras' : 'No mês anterior') + ': ' + (anterior.aMais || anterior.aMenos ? (saldoAnt > 0.005 ? fmtMoney(saldoAnt) + ' a mais.' : saldoAnt < -0.005 ? fmtMoney(-saldoAnt) + ' de economia.' : 'mesmo preço.') : 'sem comparação.');
+    }
+    card.appendChild(el('div', { class: 'pml-metric-label', style: 'margin:4px 0 6px; font-size:14px; color:' + (saldoAtual > 0.005 ? 'var(--bad)' : saldoAtual < -0.005 ? 'var(--good)' : 'var(--ink)') + ';', text: frase }));
+    card.appendChild(tabelaCompras(atual.itens));
+
+    card.appendChild(el('div', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: visao === 'semana' ? 'Todas as semanas' : 'Todos os meses' }));
+    card.appendChild(el('div', { class: 'pml-table-wrap' }, [el('table', { class: 'pml-table' }, [
+      el('thead', {}, [el('tr', {}, [visao === 'semana' ? 'Semana' : 'Mês', 'Compras', 'Gasto', 'Pagou a mais', 'Economizou', 'Saldo'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); }))]),
+      el('tbody', {}, grupos.map(function (m) {
+        var saldo = m.aMais - m.aMenos;
+        return el('tr', {}, [
+          el('td', { text: visao === 'semana' ? nomeSemana(m.mes) : nomeMes(m.mes) }), el('td', { text: String(m.compras) }),
+          el('td', { class: 'num', text: fmtMoney(m.gasto) }),
+          el('td', { class: 'num', style: m.aMais ? 'color:var(--bad);' : '', text: m.aMais ? fmtMoney(m.aMais) : '—' }),
+          el('td', { class: 'num', style: m.aMenos ? 'color:var(--good);' : '', text: m.aMenos ? fmtMoney(m.aMenos) : '—' }),
+          el('td', { class: 'num', style: cor(saldo), text: (m.aMais || m.aMenos) ? sinal(saldo) : '—' })
+        ]);
+      }))
+    ])]));
+
+    var det = el('details', { style: 'margin-top:10px;' }, [el('summary', { text: 'Ver compra por compra (' + r.linhas.length + ')' })]);
+    det.appendChild(tabelaCompras(r.linhas));
+    card.appendChild(det);
+    wrap.appendChild(card);
+  }
+
+  function corDif(v) { return v === null ? '' : v > 0.005 ? 'color:var(--bad); font-weight:700;' : v < -0.005 ? 'color:var(--good); font-weight:700;' : ''; }
+  function sinalDif(v) { return v === null ? 'primeira compra' : (v > 0.005 ? '+' : v < -0.005 ? '−' : '') + fmtMoney(Math.abs(v)); }
+
+  function tabelaCompras(lista) {
+    var cor = corDif, sinal = sinalDif;
+    return el('div', { class: 'pml-table-wrap' }, [el('table', { class: 'pml-table' }, [
+      el('thead', {}, [el('tr', {}, ['Data', 'Item', 'Qtd', 'Pagou', 'Preço', 'Antes', 'Diferença', 'No total'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); }))]),
+      el('tbody', {}, lista.map(function (x) {
+        var casas = x.unidade === 'kg' ? 2 : 4;
+        function fu(v) { return v === null ? '—' : 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: casas }) + '/' + x.unidade; }
+        return el('tr', {}, [
+          el('td', { text: x.data.split('-').reverse().join('/') }),
+          el('td', { text: x.descricao === x.item ? x.item : x.item + ' · ' + x.descricao }),
+          el('td', { class: 'num', text: x.qtd.toLocaleString('pt-BR') + ' ' + x.unidade }),
+          el('td', { class: 'num', text: fmtMoney(x.pago) }),
+          el('td', { class: 'num', text: fu(x.unit) }),
+          el('td', { class: 'num', text: fu(x.ref) }),
+          el('td', { class: 'num', style: cor(x.difUnit), text: x.difUnit === null ? '—' : (x.ref ? (x.difUnit > 0 ? '+' : '') + fmtPct(x.difUnit / x.ref) : '—') }),
+          el('td', { class: 'num', style: cor(x.difTotal), text: sinal(x.difTotal) })
+        ]);
+      }))
+    ])]);
   }
   function render() {
     destruirGraficos();

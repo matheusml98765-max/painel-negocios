@@ -17,9 +17,10 @@
     return (n * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
   }
 
-  function custoDoItem(itemId) {
+  // dataRef (opcional): data da venda, para a peca 3D usar o preco das compras daquela epoca.
+  function custoDoItem(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
-    var c3d = custo3dDoAnuncio(id);
+    var c3d = custo3dDoAnuncio(id, dataRef);
     if (c3d !== null) return { valor: c3d, fonte: '3d' };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
@@ -89,8 +90,10 @@
         var qtd = Number(i.quantidade) || 1;
         var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
         var id = String(i.item_id || 'sem-id');
-        var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0 });
+        var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0, custoAcum: 0, semCusto: false });
         g.unidades += qtd;
+        var cv = custoDoItem(id, t.data);
+        if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
         g.vendas += 1;
         g.receita += valor * parte;
         g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
@@ -104,7 +107,8 @@
     var linhas = Object.keys(grupos).map(function (k) {
       var g = grupos[k];
       g.tarifasDevolucao = tarifasDev[String(g.itemId).toUpperCase()] || 0;
-      var custo = custoDoItem(g.itemId);
+      // Custo de cada venda pelo preco da epoca dela; custoUnit e a media do periodo.
+      var custo = g.semCusto ? null : { valor: g.unidades ? g.custoAcum / g.unidades : 0, fonte: g.fonteVenda };
       g.custoUnit = custo ? custo.valor : null;
       g.fonteCusto = custo ? custo.fonte : null;
       g.imposto = g.receita * imposto;

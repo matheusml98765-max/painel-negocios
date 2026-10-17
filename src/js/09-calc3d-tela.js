@@ -61,7 +61,7 @@
     }
 
     var resumoFil = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;' }, tiposFilamento().map(function (t) {
-      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ' (preço atual, compras dos últimos 30 dias): ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
+      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ' (preço de hoje: compras dos últimos 30 dias): ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
     }));
     wrap.appendChild(cardLotes('2. Remessas de filamento', c.filamentos, [
       { titulo: 'Data', chave: 'data', largura: 130 },
@@ -193,4 +193,5 @@
       wrap.appendChild(sim);
     }
     renderLuzInsumosCards(wrap);
+    renderComprasCard(wrap);
   }
