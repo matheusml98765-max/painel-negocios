@@ -277,7 +277,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita' }, fatPeriodo: '', calc3d: null };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -368,6 +368,10 @@
       state.faturamento = fa ? JSON.parse(fa.value) : null;
     } catch (e) { state.faturamento = null; }
     try {
+      var ads = await window.storage.get('ml-ads-shopee');
+      state.adsShopee = ads ? JSON.parse(ads.value) : null;
+    } catch (e) { state.adsShopee = null; }
+    try {
       var ca = await window.storage.get('ml-custos-avulsos');
       state.custosAvulsos = ca ? JSON.parse(ca.value) : {};
     } catch (e) { state.custosAvulsos = {}; }
@@ -415,6 +419,19 @@
       if (dados && Array.isArray(dados.periodos)) {
         state.faturamento = dados;
         try { await window.storage.set('ml-faturamento', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  async function sincronizarAdsShopee() {
+    if (!state.gistUrlShopee) return;
+    try {
+      var r = await fetch(urlArquivoIrmao(state.gistUrlShopee, 'ads_shopee.json') + '?_=' + Date.now());
+      if (!r.ok) return;
+      var dados = await r.json();
+      if (dados && Array.isArray(dados.dias)) {
+        state.adsShopee = dados;
+        try { await window.storage.set('ml-ads-shopee', JSON.stringify(dados)); } catch (e) {}
       }
     } catch (e) {}
   }
@@ -482,6 +499,7 @@
       } else if (!resultado.erro && resultado.atualizadas > 0) {
         await saveTransacoes();
       }
+      await sincronizarAdsShopee();
       state.ultimaSincronizacaoShopee = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync-shopee', state.ultimaSincronizacaoShopee); } catch (e) {}
       state.errorMsg = '';
@@ -1038,12 +1056,16 @@
       var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
       if (existente) {
         var mudou = false;
-        if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || (item.custos_ml && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
+        if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || ((item.custos_ml || item.custos_shopee) && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
           existente.itens = item.itens;
           mudou = true;
         }
         if (tipo === 'venda' && item.custos_ml && JSON.stringify(existente.custosMl || null) !== JSON.stringify(item.custos_ml)) {
           existente.custosMl = item.custos_ml;
+          mudou = true;
+        }
+        if (tipo === 'venda' && item.custos_shopee && JSON.stringify(existente.custosShopee || null) !== JSON.stringify(item.custos_shopee)) {
+          existente.custosShopee = item.custos_shopee;
           mudou = true;
         }
         if (mudou) atualizadas++; else ignoradas++;
@@ -1059,6 +1081,9 @@
       }
       if (tipo === 'venda' && item.custos_ml) {
         transacaoNova.custosMl = item.custos_ml;
+      }
+      if (tipo === 'venda' && item.custos_shopee) {
+        transacaoNova.custosShopee = item.custos_shopee;
       }
       novas.push(transacaoNova);
     });
@@ -1522,6 +1547,16 @@
       return a;
     }, { receita: 0, liquido: 0, lucro: 0, receitaComCusto: 0 });
     var levou = tot.receita ? 1 - tot.liquido / tot.receita : null;
+    function ficouCom(p) {
+      var t = lucro.linhas.filter(function (g) { return g.plataforma === p; }).reduce(function (a, g) { a.r += g.receita; a.l += g.liquido; return a; }, { r: 0, l: 0 });
+      return t.r ? 1 - t.l / t.r : null;
+    }
+    var ficouMl = ficouCom('ml'), ficouShopee = ficouCom('shopee');
+    var ads30 = adsShopeeNoPeriodo(30);
+    // So desconta o Ads quando ja existe custo cadastrado em algum produto da Shopee,
+    // senao o lucro ficaria negativo sem os produtos que o Ads ajudou a vender.
+    var shopeeComCusto = lucro.linhas.some(function (g) { return g.plataforma === 'shopee' && g.lucro !== null; });
+    var adsDesc = shopeeComCusto && ads30 ? ads30.gasto : 0;
 
     // Saudacao
     var agora = new Date();
@@ -1565,9 +1600,9 @@
     }
     var mes = el('div', { class: 'ini-mes' }, [
       kpi('Faturamento de ' + nomeMes, fmtMoney(d.mes.total), d.mes.pedidos + ' pedidos · ticket ' + fmtMoney(d.mes.pedidos ? d.mes.total / d.mes.pedidos : 0)),
-      kpi('Lucro real (30 dias, ML)', fmtMoney(tot.lucro), tot.receitaComCusto ? 'margem de ' + fmtPct(tot.lucro / tot.receitaComCusto) + ', já sem imposto' : 'cadastre os custos na aba Lucro real', tot.lucro >= 0 ? 'pos' : 'neg'),
-      kpi('O Mercado Livre ficou com', levou === null ? '—' : fmtPct(levou), 'do que você vendeu lá em 30 dias'),
-      kpi('Últimos 30 dias, todas as lojas', fmtMoney(d.total30), 'Mercado Livre e Shopee somados')
+      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro real', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
+      kpi('As plataformas ficaram com', levou === null ? '—' : fmtPct(levou), 'ML ' + fmtPct(ficouMl) + ' · Shopee ' + fmtPct(ficouShopee) + ' das vendas, antes do Ads'),
+      kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
     grid.appendChild(mes);
 
@@ -1634,6 +1669,7 @@
     comLucro.filter(function (g) { return g.lucro >= 0 && g.margem !== null && g.margem < 0.08; }).slice(0, 3).forEach(function (g) {
       alertas.push(['warn', '⚠️', g.titulo, 'Margem de só ' + fmtPct(g.margem) + '.']);
     });
+    if (ficouShopee !== null && ficouShopee > 0.35) alertas.push(['warn', '🧾', 'A Shopee ficou com ' + fmtPct(ficouShopee) + ' das suas vendas', 'Comissão, taxa fixa por pedido e afiliados pesam muito em peças baratas. Veja o simulador da Calculadora 3D.']);
     var semCusto = lucro.linhas.filter(function (g) { return g.custoUnit === null; }).length;
     if (semCusto) alertas.push(['warn', '✏️', semCusto + ' produto(s) sem custo cadastrado', 'Sem o custo, o lucro deles não entra na conta.']);
     if (state.faturamento && state.faturamento.periodos) {
@@ -1713,7 +1749,7 @@
 
   function plataformasPadrao() {
     return [
-      { id: 'shopee', nome: 'Shopee', comissao: 20, taxaFixa: 4, frete: 0, ads: 15.5, nota: 'Itens até R$ 79,99: 20% + R$ 4 por item (confira no seu extrato).' },
+      { id: 'shopee', nome: 'Shopee', comissao: 20, taxaFixa: 4.5, frete: 0, ads: 15.5, nota: 'Nas suas vendas reais: cerca de 18,6% de comissão + 1,4% de serviço + R$ 4,50 fixos por pedido. Afiliados cobram à parte quando a venda vem deles.' },
       { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro real.' },
       { id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, frete: 0, ads: 0, nota: 'Abaixo de R$ 50: 10% + R$ 4 por item (desde 15/07/2026).' }
     ];
@@ -1905,7 +1941,7 @@
     // ---------- Pecas ----------
     var pc = el('div', { class: 'pml-card' });
     pc.appendChild(el('p', { class: 'pml-section-title', text: '4. Suas peças — custo de cada uma' }));
-    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB dos anúncios dessa peça para o lucro aparecer na aba Lucro real.' }));
+    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB do Mercado Livre e o ID do item da Shopee dessa peça para o lucro aparecer na aba Lucro real.' }));
     c.produtos.forEach(function (p) {
       var custo = custoPeca3d(p);
       var selTipo = el('select', {}, tiposFilamento().map(function (t) { var o = el('option', { value: t, text: t }); if ((p.tipo || '').toUpperCase() === t) o.setAttribute('selected', ''); return o; }));
@@ -1928,7 +1964,7 @@
         campo('Peças por impressão', inputNum(p, 'porPlaca', '1')),
         campo('Impressora', selImp),
         campo('Extras por peça (R$)', inputNum(p, 'extras', '0.01'), 'Parafuso, fita, etiqueta...'),
-        campo('Anúncios (MLB...)', inputTxt(p, 'anuncios', 'MLB123, MLB456'))
+        campo('Anúncios (ML ou Shopee)', inputTxt(p, 'anuncios', 'MLB123, 22894922420'))
       ]));
       var ins = el('div', { style: 'margin:6px 0 4px;' }, [el('div', { class: 'pml-metric-label', style: 'margin-bottom:6px;', text: 'Embalagem e insumos usados por peça' })]);
       p.insumos.forEach(function (it) {
@@ -2033,39 +2069,74 @@
     return null;
   }
 
-  // Junta as vendas dos ultimos N dias por anuncio e calcula o lucro real de cada um.
-  function calcLucroPorProduto(dias) {
+  // Taxas reais de uma venda, vindas da automacao (ML ou Shopee). null = sem dados.
+  function custosDaVenda(t) {
+    var valor = Number(t.valor) || 0;
+    if (t.custosMl) {
+      var c = t.custosMl;
+      var liq = (c.liquido_recebido !== null && c.liquido_recebido !== undefined) ? Number(c.liquido_recebido) : valor - (Number(c.comissao) || 0) - (Number(c.frete) || 0);
+      return { plataforma: 'ml', liquido: liq, comissao: Number(c.comissao) || 0, frete: Number(c.frete) || 0, comissaoPorItem: true };
+    }
+    if (t.custosShopee) {
+      var s = t.custosShopee;
+      var taxas = (Number(s.comissao) || 0) + (Number(s.taxa_servico) || 0) + (Number(s.afiliados) || 0) + (Number(s.protecao_frete) || 0);
+      var liqS = (s.liquido_recebido !== null && s.liquido_recebido !== undefined) ? Number(s.liquido_recebido) : valor - taxas - (Number(s.frete_vendedor) || 0);
+      return { plataforma: 'shopee', liquido: liqS, comissao: taxas, frete: Number(s.frete_vendedor) || 0, comissaoPorItem: false, afiliados: Number(s.afiliados) || 0 };
+    }
+    return null;
+  }
+
+  function limiteDias(dias) {
     var limite = new Date();
     limite.setHours(0, 0, 0, 0);
     limite.setDate(limite.getDate() - dias + 1);
-    var limiteStr = limite.toISOString().slice(0, 10);
+    return limite.getFullYear() + '-' + String(limite.getMonth() + 1).padStart(2, '0') + '-' + String(limite.getDate()).padStart(2, '0');
+  }
+
+  // Gasto com Shopee Ads nos ultimos N dias (vem do ads_shopee.json da automacao).
+  function adsShopeeNoPeriodo(dias) {
+    var a = state.adsShopee;
+    if (!a || !Array.isArray(a.dias)) return null;
+    var lim = limiteDias(dias);
+    return a.dias.reduce(function (r, d) {
+      if (d.data >= lim) { r.gasto += Number(d.gasto) || 0; r.vendas += Number(d.vendas_ads) || 0; }
+      return r;
+    }, { gasto: 0, vendas: 0 });
+  }
+
+  // Junta as vendas dos ultimos N dias por anuncio e calcula o lucro real de cada um.
+  // plataforma: 'todas' (padrao), 'ml' ou 'shopee'.
+  function calcLucroPorProduto(dias, plataforma) {
+    plataforma = plataforma || 'todas';
+    var limiteStr = limiteDias(dias);
     var imposto = (Number(state.configLucro.imposto) || 0) / 100;
     var alvo = (Number(state.configLucro.margemAlvo) || 0) / 100;
     var grupos = {};
     var semDados = 0;
 
     state.transacoes.forEach(function (t) {
-      if (t.tipo !== 'venda' || !t.custosMl || !Array.isArray(t.itens) || t.data < limiteStr) {
-        if (t.tipo === 'venda' && !t.custosMl && t.data >= limiteStr && (t.origemId || '').indexOf('api-ml-') === 0) semDados++;
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr) return;
+      var c = custosDaVenda(t);
+      var origem = t.origemId || '';
+      if (!c) {
+        if (origem.indexOf('api-') === 0) semDados++;
         return;
       }
+      if (plataforma !== 'todas' && c.plataforma !== plataforma) return;
       var valor = Number(t.valor) || 0;
-      var c = t.custosMl;
-      var liquidoPedido = (c.liquido_recebido !== null && c.liquido_recebido !== undefined)
-        ? Number(c.liquido_recebido)
-        : valor - (Number(c.comissao) || 0) - (Number(c.frete) || 0);
       var brutoItens = t.itens.reduce(function (s, i) { return s + (Number(i.preco_unitario) || 0) * (Number(i.quantidade) || 1); }, 0);
       t.itens.forEach(function (i) {
         var qtd = Number(i.quantidade) || 1;
         var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
         var id = String(i.item_id || 'sem-id');
-        var g = grupos[id] || (grupos[id] = { itemId: id, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0 });
+        var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0 });
         g.unidades += qtd;
         g.vendas += 1;
         g.receita += valor * parte;
-        g.comissao += Number(i.comissao) || 0;
-        g.frete += (Number(c.frete) || 0) * parte;
-        g.liquido += liquidoPedido * parte;
+        g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
+        g.frete += c.frete * parte;
+        g.liquido += c.liquido * parte;
+        g.afiliados += (c.afiliados || 0) * parte;
       });
     });
 
@@ -2098,7 +2169,7 @@
       return {
         'Anúncio': g.itemId, 'Produto': g.titulo, 'Tipo': g.tipoAnuncio,
         'Unidades': g.unidades, 'Preço médio': round2(g.precoMedio), 'Faturamento': round2(g.receita),
-        'Comissão ML': round2(g.comissao), 'Frete pago': round2(g.frete), 'Recebido líquido': round2(g.liquido),
+        'Plataforma': g.plataforma === 'shopee' ? 'Shopee' : 'Mercado Livre', 'Comissão e taxas': round2(g.comissao), 'Frete pago': round2(g.frete), 'Recebido líquido': round2(g.liquido),
         'Imposto': round2(g.imposto), 'Custo unitário': g.custoUnit, 'Custo total': g.custoTotal === null ? null : round2(g.custoTotal),
         'Lucro': g.lucro === null ? null : round2(g.lucro), 'Lucro por unidade': g.lucroUnit === null ? null : round2(g.lucroUnit),
         'Margem %': g.margem === null ? null : round2(g.margem * 100), 'Preço máx. de compra': round2(g.maxCompra)
@@ -2116,7 +2187,10 @@
   function renderLucroTab(wrap) {
     var cfg = state.configLucro;
     var dias = Number(cfg.dias) || 30;
-    var calc = calcLucroPorProduto(dias);
+    var plat = cfg.plataforma || 'todas';
+    var calc = calcLucroPorProduto(dias, plat);
+    var ads = (plat === 'todas' || plat === 'shopee') ? adsShopeeNoPeriodo(dias) : null;
+    var nomePlat = plat === 'ml' ? 'O Mercado Livre' : (plat === 'shopee' ? 'A Shopee' : 'As plataformas');
     var linhas = calc.linhas;
 
     // ---- Filtros e premissas ----
@@ -2130,6 +2204,11 @@
       [['receita', 'Mais vendidos (R$)'], ['lucro', 'Maior lucro'], ['margem', 'Menor margem primeiro'], ['semcusto', 'Sem custo primeiro']].map(function (o) {
         var op = el('option', { value: o[0], text: o[1] }); if (o[0] === cfg.ordem) op.setAttribute('selected', ''); return op;
       }));
+    var selPlat = el('select', { onchange: function () { cfg.plataforma = selPlat.value; salvarConfigLucro(); render(); } },
+      [['todas', 'ML e Shopee'], ['ml', 'Só Mercado Livre'], ['shopee', 'Só Shopee']].map(function (o) {
+        var op = el('option', { value: o[0], text: o[1] }); if (o[0] === plat) op.setAttribute('selected', ''); return op;
+      }));
+    filtros.appendChild(campo('Loja', selPlat));
     filtros.appendChild(campo('Período', selDias));
     filtros.appendChild(campo('Imposto (% da venda)', inpImp));
     filtros.appendChild(campo('Margem que você quer (%)', inpAlvo));
@@ -2138,7 +2217,7 @@
     if (linhas.length === 0) {
       var vazio = el('div', { class: 'pml-card' });
       vazio.appendChild(filtros);
-      vazio.appendChild(el('div', { class: 'pml-empty', html: 'Ainda não há vendas com os custos do Mercado Livre neste período.<br>Eles chegam sozinhos pela automação (comissão, frete e valor recebido de cada venda). Se a automação acabou de ser atualizada, abra o painel de novo daqui a pouco.' }));
+      vazio.appendChild(el('div', { class: 'pml-empty', html: 'Ainda não há vendas com as taxas das plataformas neste período.<br>Eles chegam sozinhos pela automação (comissão, frete e valor recebido de cada venda). Se a automação acabou de ser atualizada, abra o painel de novo daqui a pouco.' }));
       wrap.appendChild(vazio);
       renderFaturaCard(wrap);
       return;
@@ -2155,17 +2234,26 @@
 
     var metr = el('div', { class: 'pml-metrics' }, [
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + dias + ' dias)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão e frete' })]),
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'O Mercado Livre ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ' · já sem imposto' })])
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão, taxas e frete' })]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: nomePlat + ' ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
     ]);
+    if (ads && ads.gasto > 0) {
+      metr.appendChild(el('div', { class: 'pml-metric' }, [
+        el('p', { class: 'pml-metric-label', text: 'Shopee Ads (' + dias + ' dias)' }),
+        el('p', { class: 'pml-metric-value neg', text: fmtMoney(ads.gasto) }),
+        el('p', { class: 'pml-margin', text: 'trouxe ' + fmtMoney(ads.vendas) + ' em vendas' + (tot.receitaComCusto ? '. Lucro depois do Ads: ' + fmtMoney(tot.lucro - ads.gasto) : '. Cadastre o custo das peças para ver o lucro depois do Ads.') })
+      ]));
+    }
     wrap.appendChild(metr);
 
     // ---- Alertas ----
     var alertas = [];
     if (tot.prejuizo) alertas.push('🔴 <b>' + tot.prejuizo + ' produto(s) dando prejuízo</b> no período (linhas em vermelho na tabela).');
     if (tot.semCusto) alertas.push('✏️ <b>' + tot.semCusto + ' produto(s) sem custo cadastrado.</b> Digite quanto você pagou direto na tabela (campo pontilhado) para ver o lucro deles.');
-    if (calc.semDados) alertas.push('ℹ️ ' + calc.semDados + ' venda(s) antigas ainda sem os custos do ML — elas não entram nesta conta.');
+    if (calc.semDados) alertas.push('ℹ️ ' + calc.semDados + ' venda(s) ainda sem as taxas da plataforma — elas não entram nesta conta.');
+    var afil = linhas.reduce(function (s2, g) { return s2 + (g.afiliados || 0); }, 0);
+    if (afil > 0) alertas.push('🤝 Comissão de afiliados da Shopee no período: <b>' + fmtMoney(afil) + '</b> (já descontada do recebido).');
     if (alertas.length) wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: alertas.join('<br>') }));
 
     // ---- Tabela por produto ----
@@ -2188,7 +2276,7 @@
     var table = el('table', { class: 'pml-table pml-tabela-lucro' });
     table.appendChild(el('tr', {}, [
       el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Un.' }), el('th', { class: 'num', text: 'Preço méd.' }),
-      el('th', { class: 'num', text: 'Taxas ML' }), el('th', { class: 'num', text: 'Recebido' }), el('th', { class: 'num', text: 'Custo un.' }),
+      el('th', { class: 'num', text: 'Taxas' }), el('th', { class: 'num', text: 'Recebido' }), el('th', { class: 'num', text: 'Custo un.' }),
       el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Margem' }),
       el('th', { class: 'num', text: 'Pagar até' })
     ]));
@@ -2217,11 +2305,11 @@
       table.appendChild(el('tr', { class: classe }, [
         el('td', {}, [
           el('div', { class: 'pml-titulo-prod', title: g.titulo, text: g.titulo }),
-          el('div', { class: 'pml-margin' }, [document.createTextNode(g.itemId + (g.tipoAnuncio ? ' · ' + g.tipoAnuncio : '')), tag])
+          el('div', { class: 'pml-margin' }, [document.createTextNode((g.plataforma === 'shopee' ? 'Shopee ' : '') + g.itemId + (g.tipoAnuncio ? ' · ' + g.tipoAnuncio : '')), tag])
         ]),
         el('td', { class: 'num', text: String(g.unidades) }),
         el('td', { class: 'num', text: fmtMoney(g.precoMedio) }),
-        el('td', { class: 'num', title: 'Comissão ' + fmtMoney(g.comissao) + ' + frete ' + fmtMoney(g.frete), text: fmtMoney(g.taxasMl) + ' (' + fmtPct(g.receita ? g.taxasMl / g.receita : 0) + ')' }),
+        el('td', { class: 'num', title: (g.plataforma === 'shopee' ? 'Comissão, taxa de serviço e afiliados ' : 'Comissão ') + fmtMoney(g.comissao) + ' + frete ' + fmtMoney(g.frete), text: fmtMoney(g.taxasMl) + ' (' + fmtPct(g.receita ? g.taxasMl / g.receita : 0) + ')' }),
         el('td', { class: 'num', text: fmtMoney(g.liquido) }),
         celCusto,
         el('td', { class: 'num', style: g.lucroUnit !== null && g.lucroUnit < 0 ? 'color:var(--bad); font-weight:700;' : 'font-weight:600;', text: g.lucroUnit === null ? '—' : fmtMoney(g.lucroUnit) }),
@@ -2231,7 +2319,7 @@
       ]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas ML</b> = comissão + frete que você pagou, de cada venda real (vem da API). <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads da Shopee aparece separado no card acima. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
     renderFaturaCard(wrap);

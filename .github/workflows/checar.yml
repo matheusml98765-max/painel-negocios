@@ -1,0 +1,22 @@
+name: Checar painel
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: index.html montado a partir de src/
+        run: node scripts/montar.mjs --check
+      - name: Sintaxe do JavaScript
+        run: |
+          node -e "const s=require('fs').readFileSync('index.html','utf8');const m=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)];require('fs').writeFileSync('/tmp/painel.js',m[m.length-1][1])"
+          node --check /tmp/painel.js
+      - name: Testes das contas
+        run: node --test tests/*.test.mjs
