@@ -39,8 +39,8 @@
     } else if (state.tab === 'financeiro') {
       renderFinanceiroTab(wrap);
     } else {
-      renderImportarTab(wrap);
       renderBackupNuvemCard(wrap);
+      renderImportarTab(wrap);
       renderBackupCard(wrap);
     }
     root.appendChild(wrap);
