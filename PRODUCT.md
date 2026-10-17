@@ -16,6 +16,7 @@ Quem vende no Mercado Livre e na Shopee não sabe quanto lucra em cada produto. 
 - Taxas reais da Shopee por pedido (comissão, serviço, afiliados) e gasto com Shopee Ads.
 - Calculadora de custo da impressão 3D: remessas de filamento e insumos com preços que mudam, luz, desgaste das impressoras, perdas, e simulador de preço por plataforma.
 - Tela de início com resumo do dia e do mês, gráficos e alertas; tema escuro e claro.
+- Meta do mês com projeção pelo ritmo de vendas, mapa de calor de vendas por dia da semana e hora, e backup dos custos para levar a outro navegador.
 - Tudo atualizado sozinho de hora em hora.
 
 ## Critérios de "pronto" para uma funcionalidade
@@ -27,7 +28,7 @@ Quem vende no Mercado Livre e na Shopee não sabe quanto lucra em cada produto. 
 
 ## Próximos passos
 
-- Guardar custos fora do navegador (hoje ficam só no `localStorage`).
+- Guardar custos fora do navegador (hoje: `localStorage` + backup manual em arquivo).
 - TikTok Shop.
 - Custos da Shopee por variação (dupla face × parafuso) em vez de por anúncio.
 - Empacotar a instalação para outros vendedores: configuração por loja, nada fixo no código.

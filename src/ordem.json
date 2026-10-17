@@ -13,6 +13,7 @@
  "src/js/09-calc3d-tela.js",
  "src/js/10-lucro-calculos.js",
  "src/js/11-lucro-tela.js",
+ "src/js/13-metas-calor-backup.js",
  "src/js/12-render.js",
  "src/fim.html"
 ]

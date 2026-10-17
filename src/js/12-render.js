@@ -32,6 +32,7 @@
       renderFinanceiroTab(wrap);
     } else {
       renderImportarTab(wrap);
+      renderBackupCard(wrap);
     }
     root.appendChild(wrap);
   }

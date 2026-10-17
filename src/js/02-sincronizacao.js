@@ -1,5 +1,9 @@
   async function loadData() {
     try {
+      var mt = await window.storage.get('ml-metas');
+      state.metas = mt ? JSON.parse(mt.value) : {};
+    } catch (e) { state.metas = {}; }
+    try {
       var p = await window.storage.get('ml-produtos');
       state.produtos = p ? JSON.parse(p.value) : [];
     } catch (e) { state.produtos = []; }

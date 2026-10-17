@@ -66,6 +66,8 @@
       kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
     grid.appendChild(mes);
+    var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
+    grid.appendChild(blocoMetas(d, lucroMesCalc));
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });
@@ -147,6 +149,7 @@
     });
     grid.appendChild(blocoAl);
 
+    grid.appendChild(blocoMapaCalor());
     wrap.appendChild(grid);
 
     // Desenha os graficos depois que os canvas estao na pagina

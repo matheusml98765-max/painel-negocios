@@ -236,3 +236,31 @@
     .ini-pulso { animation: none; }
     #intro { transition: opacity .3s ease; }
   }
+  /* Metas */
+  .meta-linha { margin-top: 6px; }
+  .meta-linha + .meta-linha { margin-top: 18px; }
+  .meta-topo { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; margin-bottom: 8px; }
+  .meta-rotulo { font-weight: 700; }
+  .meta-num { font-family: 'Sora', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .meta-trilho { position: relative; height: 14px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .meta-trilho span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+  .meta-proj { background: var(--accent-bg); outline: 1px dashed var(--accent); outline-offset: -1px; }
+  .meta-feito { background: linear-gradient(90deg, var(--accent), var(--electric)); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+  .meta-texto { margin: 8px 0 0; font-size: 13.5px; }
+
+  /* Mapa de calor */
+  .calor-grade { display: grid; grid-template-columns: 38px repeat(24, minmax(18px, 1fr)); gap: 3px; min-width: 620px; }
+  .calor-canto { }
+  .calor-hora { font-size: 11px; color: var(--muted); text-align: left; }
+  .calor-dia { font-size: 12px; color: var(--muted); font-weight: 600; display: flex; align-items: center; }
+  .calor-cel { height: 22px; border-radius: 5px; background: var(--surface-2); }
+  .calor-cel:focus-visible { outline: 2px solid var(--electric); outline-offset: 1px; }
+  .calor-cel.n1 { background: color-mix(in srgb, var(--accent) 22%, var(--surface-2)); }
+  .calor-cel.n2 { background: color-mix(in srgb, var(--accent) 42%, var(--surface-2)); }
+  .calor-cel.n3 { background: color-mix(in srgb, var(--accent) 62%, var(--surface-2)); }
+  .calor-cel.n4 { background: color-mix(in srgb, var(--accent) 82%, var(--surface-2)); }
+  .calor-cel.n5 { background: var(--accent); }
+  .calor-legenda { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .calor-legenda i { width: 18px; height: 12px; display: inline-block; }
+  .calor-legenda span { margin: 0 4px; }
+

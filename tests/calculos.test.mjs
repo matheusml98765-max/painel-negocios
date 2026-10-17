@@ -122,3 +122,39 @@ test('vendas fora do período não entram', () => {
   p.state.transacoes = [{ tipo: 'venda', data: '2020-01-01', valor: 10, origemId: 'api-ml-1-venda', itens: [{ item_id: 'X', quantidade: 1, preco_unitario: 10 }], custosMl: { comissao: 1, frete: 1, liquido_recebido: 8 } }];
   assert.equal(p.calcLucroPorProduto(30).linhas.length, 0);
 });
+
+test('projeção do mês estende o ritmo atual até o último dia', () => {
+  const p = painelBase();
+  // 10 de outubro, meio-dia: 9,5 dias decorridos de 31
+  const agora = new Date(2026, 9, 10, 12, 0, 0);
+  const r = p.calcProjecaoMes(9500, agora);
+  perto(r.decorrido, 9.5, 'dias decorridos');
+  perto(r.projecao, 9500 / 9.5 * 31, 'projeção');
+  perto(r.diasRestantes, 21.5, 'dias restantes');
+});
+
+test('projeção fica vazia nas primeiras horas do mês', () => {
+  const p = painelBase();
+  assert.equal(p.calcProjecaoMes(500, new Date(2026, 10, 1, 8, 0, 0)).projecao, null);
+});
+
+test('mapa de calor conta pedidos por dia da semana e hora e ignora vendas antigas', () => {
+  const p = painelBase();
+  const agora = new Date(2026, 9, 17, 10, 0, 0);
+  const v = (iso, valor) => { const d = new Date(iso); return { tipo: 'venda', valor, data: iso.slice(0, 10), hora: d.getHours(), dow: d.getDay(), dataHora: d.toISOString() }; };
+  p.state.transacoes = [
+    v('2026-10-16T20:15:00', 30), v('2026-10-16T20:40:00', 20), v('2026-10-15T09:00:00', 10),
+    v('2026-08-01T20:00:00', 99), // fora dos 30 dias
+    { tipo: 'venda', valor: 5, data: '2026-10-14' }, // sem horario
+    { tipo: 'cancelamento', valor: 50, data: '2026-10-16', hora: 20, dow: 5 },
+  ];
+  const m = p.calcMapaCalor(p.state.transacoes, 30, agora);
+  assert.equal(m.total, 3);
+  assert.equal(m.semHora, 1);
+  const sexta = new Date('2026-10-16T20:15:00').getDay();
+  assert.equal(m.matriz[sexta][20].pedidos, 2);
+  perto(m.matriz[sexta][20].valor, 50, 'valor na célula');
+  assert.deepEqual({ ...m.melhor }, { dow: sexta, hora: 20 });
+  const f = p.melhorFaixa(m.porHora);
+  assert.equal(f.pedidos, 2);
+});

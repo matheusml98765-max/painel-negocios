@@ -93,6 +93,9 @@
         ignoradas++; return;
       }
       var data = dataRaw.split('T')[0];
+      // Horario da venda (para o mapa de calor), no fuso de quem abre o painel
+      var quando = dataRaw.indexOf('T') !== -1 ? new Date(dataRaw) : null;
+      var temHora = quando && !isNaN(quando.getTime());
       var origemId = origemPrefix + item.id + '-' + tipo;
       var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
       if (existente) {
@@ -109,6 +112,10 @@
           existente.custosShopee = item.custos_shopee;
           mudou = true;
         }
+        if (temHora && existente.hora === undefined) {
+          existente.hora = quando.getHours(); existente.dow = quando.getDay(); existente.dataHora = quando.toISOString();
+          mudou = true;
+        }
         if (mudou) atualizadas++; else ignoradas++;
         return;
       }
@@ -120,6 +127,7 @@
       if (tipo === 'venda' && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
       }
+      if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }
       if (tipo === 'venda' && item.custos_ml) {
         transacaoNova.custosMl = item.custos_ml;
       }
