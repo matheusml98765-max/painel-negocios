@@ -383,6 +383,15 @@
       var cl = await window.storage.get('ml-config-lucro');
       if (cl) { var cfg = JSON.parse(cl.value); Object.keys(cfg).forEach(function (k) { state.configLucro[k] = cfg[k]; }); }
     } catch (e) {}
+    // A automacao manda a Shopee para o mesmo Gist do ML. Se so o link do ML
+    // estiver salvo, descobre o da Shopee sozinho.
+    if (!state.gistUrlShopee && state.gistUrl) {
+      try {
+        var urlShopee = urlArquivoIrmao(state.gistUrl, 'pedidos_shopee.json');
+        var teste = await fetch(urlShopee + '?_=' + Date.now());
+        if (teste.ok) await salvarGistUrlShopee(urlShopee);
+      } catch (e) {}
+    }
     state.loaded = true;
     render();
     if (state.gistUrl) { sincronizarGist(true); }
