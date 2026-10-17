@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const partes = ['src/js/01-estado.js', 'src/js/08-calc3d-dados.js', 'src/js/10-lucro-calculos.js', 'src/js/13-metas-calor-backup.js'];
+const partes = ['src/js/01-estado.js', 'src/js/06-tema-intro.js', 'src/js/08-calc3d-dados.js', 'src/js/10-lucro-calculos.js', 'src/js/13-metas-calor-backup.js', 'src/js/14-produto-calculos.js', 'src/js/16-relatorio.js'];
 
 export function carregarPainel() {
   const memoria = {};
@@ -16,6 +16,6 @@ export function carregarPainel() {
   contexto.window = contexto;
   vm.createContext(contexto);
   const codigo = partes.map((p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8')).join('\n');
-  const expor = 'return { state: state, fmtMoney: fmtMoney, custoPeca3d: custoPeca3d, custoGrama: custoGrama, custoEmbalagem: custoEmbalagem, custo3dDoAnuncio: custo3dDoAnuncio, getCalc3d: getCalc3d, calcLucroPorProduto: calcLucroPorProduto, custoDoItem: custoDoItem, adsShopeeNoPeriodo: adsShopeeNoPeriodo, calcProjecaoMes: calcProjecaoMes, calcMapaCalor: calcMapaCalor, melhorFaixa: melhorFaixa };';
+  const expor = 'return { state: state, fmtMoney: fmtMoney, custoPeca3d: custoPeca3d, custoGrama: custoGrama, custoEmbalagem: custoEmbalagem, custo3dDoAnuncio: custo3dDoAnuncio, getCalc3d: getCalc3d, calcLucroPorProduto: calcLucroPorProduto, custoDoItem: custoDoItem, adsShopeeNoPeriodo: adsShopeeNoPeriodo, calcProjecaoMes: calcProjecaoMes, calcMapaCalor: calcMapaCalor, melhorFaixa: melhorFaixa, historicoProduto: historicoProduto, simularDesconto: simularDesconto, calcAdsPorProduto: calcAdsPorProduto, calcReposicao: calcReposicao, calcFilamento: calcFilamento, calcRelatorioMes: calcRelatorioMes, horasDesdeAtualizacaoAutomacao: horasDesdeAtualizacaoAutomacao };';
   return vm.runInContext('(function () {\n' + codigo + '\n' + expor + '\n})()', contexto);
 }

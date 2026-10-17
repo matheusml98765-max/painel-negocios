@@ -1,10 +1,15 @@
   // ===================== LUCRO REAL =====================
 
+  // Horas desde a ultima execucao da automacao. Usa o status.json (escrito a cada execucao);
+  // a fatura so atualiza a cada 6 horas, entao ela so serve de reserva.
   function horasDesdeAtualizacaoAutomacao() {
-    if (!state.faturamento || !state.faturamento.atualizado_em) return null;
-    var t = new Date(state.faturamento.atualizado_em).getTime();
+    var fonte = (state.statusAuto && state.statusAuto.atualizado_em) || null;
+    var folga = 0;
+    if (!fonte && state.faturamento && state.faturamento.atualizado_em) { fonte = state.faturamento.atualizado_em; folga = 6; }
+    if (!fonte) return null;
+    var t = new Date(fonte).getTime();
     if (isNaN(t)) return null;
-    return (Date.now() - t) / 36e5;
+    return Math.max(0, (Date.now() - t) / 36e5 - folga);
   }
 
   function fmtPct(n) {
@@ -59,16 +64,18 @@
 
   // Junta as vendas dos ultimos N dias por anuncio e calcula o lucro real de cada um.
   // plataforma: 'todas' (padrao), 'ml' ou 'shopee'.
-  function calcLucroPorProduto(dias, plataforma) {
+  // intervalo (opcional): { de: 'AAAA-MM-DD', ate: 'AAAA-MM-DD' } no lugar dos ultimos N dias.
+  function calcLucroPorProduto(dias, plataforma, intervalo) {
     plataforma = plataforma || 'todas';
-    var limiteStr = limiteDias(dias);
+    var limiteStr = intervalo ? intervalo.de : limiteDias(dias);
+    var ateStr = intervalo ? intervalo.ate : null;
     var imposto = (Number(state.configLucro.imposto) || 0) / 100;
     var alvo = (Number(state.configLucro.margemAlvo) || 0) / 100;
     var grupos = {};
     var semDados = 0;
 
     state.transacoes.forEach(function (t) {
-      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr) return;
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
       var c = custosDaVenda(t);
       var origem = t.origemId || '';
       if (!c) {

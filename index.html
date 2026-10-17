@@ -172,7 +172,7 @@
   .pml-titulo-prod { font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
   .pml-row-alerta td { background: var(--bad-bg); }
   .pml-row-atencao td { background: var(--warn-bg); }
-  .pml-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: 1px; }
+  .pml-tag { display: inline-block; white-space: nowrap; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 6px; vertical-align: 1px; }
   .pml-tag.prejuizo { background: var(--bad-bg); color: var(--bad); }
   .pml-tag.baixa { background: var(--warn-bg); color: var(--warn); }
   .pml-tag.boa { background: var(--good-bg); color: var(--good); }
@@ -287,6 +287,31 @@
   .calor-legenda i { width: 18px; height: 12px; display: inline-block; }
   .calor-legenda span { margin: 0 4px; }
 
+
+  /* Ficha do produto, Ads por produto, reposicao e relatorio */
+  .pml-link-prod { background: none; border: 0; padding: 0; color: var(--ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .pml-link-prod:hover, .pml-link-prod:focus-visible { color: var(--accent); text-decoration-color: var(--accent); }
+  .ficha-prod { border-color: var(--accent); }
+  .ficha-sub { font-family: 'Sora', sans-serif; font-size: 15px; margin: 22px 0 10px; color: var(--ink); }
+  .sim-faixa { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
+  .sim-faixa input[type=range] { flex: 1; max-width: 360px; accent-color: var(--accent); }
+  .sim-faixa b { color: var(--ink); min-width: 42px; font-size: 16px; }
+  .rel-topo { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .rel-topo h2 { font-family: 'Sora', sans-serif; font-size: 26px; margin: 0 0 4px; color: var(--ink); letter-spacing: -0.02em; }
+  .rel-acoes { display: flex; gap: 10px; align-items: center; }
+  .rel-acoes select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--field-line); background: var(--surface); color: var(--ink); }
+  .rel-nota { display: flex; gap: 22px; align-items: center; }
+  .rel-nota-num { font-family: 'Sora', sans-serif; font-size: 56px; font-weight: 800; line-height: 1; min-width: 96px; text-align: center; color: var(--warn); }
+  .rel-nota-num.pos { color: var(--good); }
+  .rel-nota-num.neg { color: var(--bad); }
+  .rel-item { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .rel-valor { min-width: 104px; font-weight: 700; color: var(--bad); font-variant-numeric: tabular-nums; }
+  .rel-plano { margin: 0; padding-left: 22px; line-height: 1.7; color: var(--ink); font-size: 14.5px; }
+  @media (max-width: 560px) { .rel-nota { flex-direction: column; align-items: flex-start; } .rel-item { flex-direction: column; gap: 2px; } }
+  @media print {
+    .pml-tabs, .pml-header-acoes, .rel-acoes, #intro, .pml-import-summary { display: none !important; }
+    .pml-card, .pml-metric { box-shadow: none !important; break-inside: avoid; }
+  }
 </style>
 
 <script>
@@ -307,7 +332,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '' };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -455,6 +480,11 @@
 
   async function sincronizarFaturamento() {
     if (!state.gistUrl) return;
+    try {
+      // status.json: hora da ultima execucao da automacao (a fatura so atualiza a cada 6 h)
+      var rs = await fetch(urlArquivoIrmao(state.gistUrl, 'status.json') + '?_=' + Date.now());
+      if (rs.ok) { var st = await rs.json(); if (st && st.atualizado_em) state.statusAuto = st; }
+    } catch (e) {}
     try {
       var r = await fetch(urlArquivoIrmao(state.gistUrl, 'faturamento.json') + '?_=' + Date.now());
       if (!r.ok) return;
@@ -700,7 +730,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
+    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],
@@ -749,6 +779,7 @@
   }
 
   function renderEstoqueTab(wrap) {
+    renderReposicaoCard(wrap);
     var formError = el('div', { class: 'pml-error', style: 'display:none' });
     var card = el('div', { class: 'pml-card' });
     card.appendChild(el('p', { class: 'pml-section-title', text: 'Adicionar produto' }));
@@ -2101,11 +2132,16 @@
 
   // ===================== LUCRO REAL =====================
 
+  // Horas desde a ultima execucao da automacao. Usa o status.json (escrito a cada execucao);
+  // a fatura so atualiza a cada 6 horas, entao ela so serve de reserva.
   function horasDesdeAtualizacaoAutomacao() {
-    if (!state.faturamento || !state.faturamento.atualizado_em) return null;
-    var t = new Date(state.faturamento.atualizado_em).getTime();
+    var fonte = (state.statusAuto && state.statusAuto.atualizado_em) || null;
+    var folga = 0;
+    if (!fonte && state.faturamento && state.faturamento.atualizado_em) { fonte = state.faturamento.atualizado_em; folga = 6; }
+    if (!fonte) return null;
+    var t = new Date(fonte).getTime();
     if (isNaN(t)) return null;
-    return (Date.now() - t) / 36e5;
+    return Math.max(0, (Date.now() - t) / 36e5 - folga);
   }
 
   function fmtPct(n) {
@@ -2160,16 +2196,18 @@
 
   // Junta as vendas dos ultimos N dias por anuncio e calcula o lucro real de cada um.
   // plataforma: 'todas' (padrao), 'ml' ou 'shopee'.
-  function calcLucroPorProduto(dias, plataforma) {
+  // intervalo (opcional): { de: 'AAAA-MM-DD', ate: 'AAAA-MM-DD' } no lugar dos ultimos N dias.
+  function calcLucroPorProduto(dias, plataforma, intervalo) {
     plataforma = plataforma || 'todas';
-    var limiteStr = limiteDias(dias);
+    var limiteStr = intervalo ? intervalo.de : limiteDias(dias);
+    var ateStr = intervalo ? intervalo.ate : null;
     var imposto = (Number(state.configLucro.imposto) || 0) / 100;
     var alvo = (Number(state.configLucro.margemAlvo) || 0) / 100;
     var grupos = {};
     var semDados = 0;
 
     state.transacoes.forEach(function (t) {
-      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr) return;
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
       var c = custosDaVenda(t);
       var origem = t.origemId || '';
       if (!c) {
@@ -2246,6 +2284,7 @@
     var ads = (plat === 'todas' || plat === 'shopee') ? adsShopeeNoPeriodo(dias) : null;
     var nomePlat = plat === 'ml' ? 'O Mercado Livre' : (plat === 'shopee' ? 'A Shopee' : 'As plataformas');
     var linhas = calc.linhas;
+    if (state.fichaProduto) renderFichaProduto(wrap);
 
     // ---- Filtros e premissas ----
     var filtros = el('div', { class: 'pml-filtros' });
@@ -2358,7 +2397,7 @@
 
       table.appendChild(el('tr', { class: classe }, [
         el('td', {}, [
-          el('div', { class: 'pml-titulo-prod', title: g.titulo, text: g.titulo }),
+          el('button', { class: 'pml-titulo-prod pml-link-prod', title: 'Ver histórico, simular desconto e Ads: ' + g.titulo, text: g.titulo, onclick: function () { abrirFichaProduto(g.itemId); } }),
           el('div', { class: 'pml-margin' }, [document.createTextNode((g.plataforma === 'shopee' ? 'Shopee ' : '') + g.itemId + (g.tipoAnuncio ? ' · ' + g.tipoAnuncio : '')), tag])
         ]),
         el('td', { class: 'num', text: String(g.unidades) }),
@@ -2373,9 +2412,10 @@
       ]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads da Shopee aparece separado no card acima. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads da Shopee aparece no card acima e, por produto, logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
+    if (plat !== 'ml') renderAdsPorProduto(wrap);
     renderFaturaCard(wrap);
   }
 
@@ -2644,10 +2684,527 @@
     wrap.appendChild(card);
   }
 
+  // ===================== CONTAS POR PRODUTO =====================
+  // Historico, simulador de desconto, Ads por produto, reposicao e filamento.
+
+  function isoDia(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function mesmoItem(a, b) { return String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase(); }
+
+  // Vendas de um anuncio por semana (segunda a domingo), das ultimas N semanas.
+  // lucro fica null na semana em que falta o custo ou as taxas de alguma venda.
+  function historicoProduto(itemId, semanas, agora) {
+    semanas = semanas || 12;
+    agora = agora || new Date();
+    var hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    var seg = new Date(hoje); seg.setDate(hoje.getDate() - (hoje.getDay() + 6) % 7);
+    var semanasLista = [];
+    for (var i = semanas - 1; i >= 0; i--) {
+      var d = new Date(seg); d.setDate(seg.getDate() - 7 * i);
+      semanasLista.push({ inicio: isoDia(d), unidades: 0, receita: 0, liquido: 0, semTaxas: 0 });
+    }
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data || t.data < semanasLista[0].inicio) return;
+      var alvo = null;
+      for (var k = semanasLista.length - 1; k >= 0; k--) { if (t.data >= semanasLista[k].inicio) { alvo = semanasLista[k]; break; } }
+      if (!alvo) return;
+      var bruto = t.itens.reduce(function (s, i) { return s + (Number(i.preco_unitario) || 0) * (Number(i.quantidade) || 1); }, 0);
+      var c = custosDaVenda(t);
+      t.itens.forEach(function (i) {
+        if (!mesmoItem(i.item_id, itemId)) return;
+        var qtd = Number(i.quantidade) || 1;
+        var parte = bruto > 0 ? (Number(i.preco_unitario) || 0) * qtd / bruto : 1 / t.itens.length;
+        alvo.unidades += qtd;
+        alvo.receita += (Number(t.valor) || 0) * parte;
+        if (c) alvo.liquido += c.liquido * parte; else alvo.semTaxas += qtd;
+      });
+    });
+    var custo = custoDoItem(itemId);
+    var imp = (Number(state.configLucro.imposto) || 0) / 100;
+    semanasLista.forEach(function (s) {
+      s.precoMedio = s.unidades ? s.receita / s.unidades : null;
+      s.lucro = (custo && !s.semTaxas) ? s.liquido - s.receita * imp - custo.valor * s.unidades : null;
+    });
+    return semanasLista;
+  }
+
+  // Simula um desconto sobre o preco medio atual, mantendo a % de taxas, o frete
+  // por unidade e a taxa fixa por pedido da Shopee que aparecem nas vendas reais.
+  function simularDesconto(g, desconto) {
+    if (!g || !g.unidades || !g.receita) return null;
+    var imp = (Number(state.configLucro.imposto) || 0) / 100;
+    var fixoPedido = 0;
+    if (g.plataforma === 'shopee') {
+      var pl = (getCalc3d().plataformas || []).find(function (p) { return p.id === 'shopee'; });
+      fixoPedido = pl ? num(pl.taxaFixa) : 0;
+    }
+    var fixoUn = fixoPedido * g.vendas / g.unidades;
+    var freteUn = g.frete / g.unidades;
+    var taxas = g.receita - g.liquido;
+    var pct = Math.max(0, (taxas - g.frete - fixoUn * g.unidades) / g.receita);
+    var custo = g.custoUnit;
+    function conta(preco) {
+      var taxasUn = preco * pct + fixoUn + freteUn;
+      var lucro = custo === null ? null : preco - taxasUn - preco * imp - custo;
+      return { preco: preco, taxas: taxasUn, recebido: preco - taxasUn, lucro: lucro, margem: lucro === null || !preco ? null : lucro / preco };
+    }
+    var atual = conta(g.precoMedio);
+    var novo = conta(g.precoMedio * (1 - desconto));
+    var res = { atual: atual, novo: novo, pctTaxas: pct, vendasAMais: null, descontoMaximo: null };
+    if (custo !== null) {
+      var precoMin = (fixoUn + freteUn + custo) / Math.max(0.01, 1 - pct - imp);
+      res.descontoMaximo = Math.max(0, 1 - precoMin / g.precoMedio);
+      if (atual.lucro > 0 && novo.lucro > 0) res.vendasAMais = atual.lucro / novo.lucro - 1;
+    }
+    return res;
+  }
+
+  // Shopee Ads por anuncio, comparado com a margem do produto antes do Ads.
+  // decisao: 'aumentar' | 'manter' | 'pausar' | 'sem-custo' | 'pouco-dado'
+  function calcAdsPorProduto() {
+    var a = state.adsShopee;
+    if (!a || !a.por_item || !Object.keys(a.por_item).length) return null;
+    var dias = Number(a.por_item_dias) || 30;
+    var mapa = {};
+    calcLucroPorProduto(dias, 'shopee').linhas.forEach(function (g) { mapa[String(g.itemId)] = g; });
+    var linhas = Object.keys(a.por_item).map(function (id) {
+      var x = a.por_item[id];
+      var g = mapa[String(id)] || null;
+      var acos = x.vendas > 0 ? x.gasto / x.vendas : null;
+      var margem = g && g.margem !== null ? g.margem : null;
+      var decisao;
+      if (x.vendas === 0 && x.gasto < 15) decisao = 'pouco-dado';
+      else if (margem === null) decisao = 'sem-custo';
+      else if (acos === null || acos > margem) decisao = 'pausar';
+      else if (acos < margem * 0.5) decisao = 'aumentar';
+      else decisao = 'manter';
+      var nomeCamp = (x.campanhas || []).map(function (c) { return c.nome; }).filter(Boolean)[0];
+      return {
+        itemId: id, titulo: g ? g.titulo : (nomeCamp || 'Anúncio ' + id), gasto: x.gasto, vendasAds: x.vendas, pedidosAds: x.pedidos,
+        cliques: x.cliques, acos: acos, margem: margem, lucro: g ? g.lucro : null,
+        lucroDepois: g && g.lucro !== null ? g.lucro - x.gasto : null, decisao: decisao, campanhas: x.campanhas || []
+      };
+    });
+    linhas.sort(function (p, q) { return q.gasto - p.gasto; });
+    return { dias: dias, linhas: linhas };
+  }
+
+  // Unidades vendidas por anuncio nos ultimos N dias.
+  function unidadesPorItem(dias) {
+    var lim = limiteDias(dias);
+    var u = {};
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < lim) return;
+      t.itens.forEach(function (i) {
+        var id = String(i.item_id || '').trim().toUpperCase();
+        if (id) u[id] = (u[id] || 0) + (Number(i.quantidade) || 1);
+      });
+    });
+    return u;
+  }
+
+  // Quanto tempo o estoque cadastrado aguenta e quanto comprar.
+  // prazo = dias que o fornecedor leva para entregar; cobrir = dias de venda a garantir depois que chegar.
+  function calcReposicao(prazo, cobrir) {
+    prazo = prazo || 10; cobrir = cobrir || 30;
+    var u = unidadesPorItem(30);
+    return state.produtos.filter(function (p) { return p.mlItemId; }).map(function (p) {
+      var id = String(p.mlItemId).trim().toUpperCase();
+      var qtd = Number(p.quantidade) || 0;
+      var porDia = (u[id] || 0) / 30;
+      var cobertura = porDia > 0 ? qtd / porDia : null;
+      var comprar = porDia > 0 ? Math.max(0, Math.ceil(porDia * (prazo + cobrir) - qtd)) : 0;
+      var situacao = porDia === 0 ? 'parado' : (cobertura <= prazo ? 'urgente' : (cobertura <= prazo + 7 ? 'logo' : 'ok'));
+      var fim = cobertura === null ? null : new Date(Date.now() + cobertura * 864e5);
+      return { produto: p, itemId: id, estoque: qtd, porDia: porDia, cobertura: cobertura, acabaEm: fim, comprar: comprar, situacao: situacao };
+    }).sort(function (a, b) {
+      return (a.cobertura === null ? 1e9 : a.cobertura) - (b.cobertura === null ? 1e9 : b.cobertura);
+    });
+  }
+
+  // Ritmo de compra de filamento (pelos lotes da Calculadora 3D) e, quando as pecas
+  // tem gramas e anuncios ligados, o consumo real pelas vendas.
+  function calcFilamento(agora) {
+    agora = agora || new Date();
+    var c = state.calc3d;
+    if (!c || !Array.isArray(c.filamentos) || c.filamentos.length < 2) return null;
+    var lotes = c.filamentos.filter(function (l) { return l.data && num(l.kg) > 0; }).sort(function (a, b) { return a.data < b.data ? -1 : 1; });
+    if (lotes.length < 2) return null;
+    var primeiro = new Date(lotes[0].data + 'T12:00:00'), ultimo = new Date(lotes[lotes.length - 1].data + 'T12:00:00');
+    var diasEntre = (ultimo - primeiro) / 864e5;
+    var kgAntes = lotes.slice(0, -1).reduce(function (s, l) { return s + num(l.kg); }, 0);
+    var kgDiaCompra = diasEntre > 0 ? kgAntes / diasEntre : null;
+    var u = unidadesPorItem(30), gramas30 = 0, pecasLigadas = 0;
+    (c.produtos || []).forEach(function (p) {
+      if (!(num(p.gramas) > 0) || !p.anuncios) return;
+      pecasLigadas++;
+      String(p.anuncios).toUpperCase().split(/[\s,;]+/).forEach(function (id) { if (id) gramas30 += (u[id] || 0) * num(p.gramas); });
+    });
+    var kgDiaVendas = pecasLigadas && gramas30 > 0 ? gramas30 / 1000 / 30 : null;
+    var ritmo = kgDiaVendas || kgDiaCompra;
+    var kgUltimo = num(lotes[lotes.length - 1].kg);
+    var proxima = ritmo ? new Date(ultimo.getTime() + kgUltimo / ritmo * 864e5) : null;
+    return {
+      lotes: lotes.length, kgTotal: kgAntes + kgUltimo, kgMesCompra: kgDiaCompra ? kgDiaCompra * 30 : null,
+      kgMesVendas: kgDiaVendas ? kgDiaVendas * 30 : null, ultimaCompra: ultimo, kgUltimo: kgUltimo,
+      proximaCompra: proxima, diasAteProxima: proxima ? Math.round((proxima - agora) / 864e5) : null,
+      fonte: kgDiaVendas ? 'vendas' : 'compras'
+    };
+  }
+  // ===================== TELAS POR PRODUTO =====================
+  // Ficha do produto (historico + simulador de desconto + Ads), Ads por produto e reposicao.
+
+  function abrirFichaProduto(itemId) {
+    state.fichaProduto = itemId;
+    render();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+  }
+
+  var DECISAO_ADS = {
+    aumentar: { tag: 'boa', texto: 'aumentar', dica: 'O Ads custa bem menos que a sua margem: dá para subir o orçamento.' },
+    manter: { tag: 'baixa', texto: 'manter', dica: 'Dá lucro, mas a folga é pequena. Mantenha e acompanhe.' },
+    pausar: { tag: 'prejuizo', texto: 'pausar ou baixar', dica: 'O Ads custa mais do que a margem do produto: cada venda pelo Ads dá prejuízo.' },
+    'sem-custo': { tag: 'baixa', texto: 'sem custo', dica: 'Cadastre o custo da peça para saber se o Ads compensa.' },
+    'pouco-dado': { tag: 'baixa', texto: 'pouco dado', dica: 'Gastou pouco até agora; espere mais uns dias.' }
+  };
+
+  function renderFichaProduto(wrap) {
+    var id = state.fichaProduto;
+    var g = calcLucroPorProduto(90, 'todas').linhas.find(function (x) { return mesmoItem(x.itemId, id); });
+    var card = el('div', { class: 'pml-card ficha-prod' });
+    var titulo = g ? g.titulo : id;
+    card.appendChild(el('div', { style: 'display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:6px;' }, [
+      el('div', {}, [
+        el('p', { class: 'pml-section-title', style: 'margin:0 0 4px;', text: titulo }),
+        el('p', { class: 'pml-margin', text: (g && g.plataforma === 'shopee' ? 'Shopee ' : 'Mercado Livre ') + id + ' · últimos 90 dias' })
+      ]),
+      el('button', { class: 'pml-btn', style: 'padding:6px 12px; font-size:13px;', text: 'Fechar', onclick: function () { state.fichaProduto = null; render(); } })
+    ]));
+    if (!g) {
+      card.appendChild(el('div', { class: 'pml-empty', text: 'Não há vendas com as taxas da plataforma para este anúncio nos últimos 90 dias.' }));
+      wrap.appendChild(card);
+      return;
+    }
+
+    // ---- Resumo ----
+    card.appendChild(el('div', { class: 'pml-metrics', style: 'margin:14px 0;' }, [
+      metricaFicha('Vendeu', g.unidades + ' un.', fmtMoney(g.receita)),
+      metricaFicha('Preço médio', fmtMoney(g.precoMedio), 'taxas de ' + fmtPct(g.receita ? g.taxasMl / g.receita : null)),
+      metricaFicha('Lucro por unidade', g.lucroUnit === null ? '—' : fmtMoney(g.lucroUnit), g.custoUnit === null ? 'falta o custo da peça' : 'custo ' + fmtMoney(g.custoUnit), g.lucroUnit === null ? '' : (g.lucroUnit >= 0 ? 'pos' : 'neg')),
+      metricaFicha('Margem', fmtPct(g.margem), g.lucro === null ? '' : 'lucro total ' + fmtMoney(g.lucro))
+    ]));
+
+    // ---- Historico ----
+    var hist = historicoProduto(id, 12);
+    var temLucro = hist.some(function (s) { return s.lucro !== null && s.unidades; });
+    card.appendChild(el('h4', { class: 'ficha-sub', text: 'Vendas por semana' }));
+    var cv = el('canvas', { role: 'img', 'aria-label': 'Unidades vendidas e lucro por semana nas últimas 12 semanas' });
+    card.appendChild(el('div', { class: 'ini-grafico baixo' }, [cv]));
+    if (!temLucro) card.appendChild(el('p', { class: 'pml-note', text: 'A linha de lucro aparece quando o produto tem custo cadastrado.' }));
+    setTimeout(function () {
+      var base = opcoesBaseGrafico();
+      var labels = hist.map(function (s) { return s.inicio.slice(8, 10) + '/' + s.inicio.slice(5, 7); });
+      var ds = [{ type: 'bar', label: 'Unidades', data: hist.map(function (s) { return s.unidades; }), backgroundColor: cssVar('--accent'), borderRadius: 4, maxBarThickness: 26, yAxisID: 'y1', order: 2 }];
+      if (temLucro) ds.push({ type: 'line', label: 'Lucro', data: hist.map(function (s) { return s.unidades ? Math.round(s.lucro * 100) / 100 : null; }), borderColor: cssVar('--good'), backgroundColor: cssVar('--good'), tension: 0.3, pointRadius: 4, borderWidth: 2.5, spanGaps: true, yAxisID: 'y', order: 1 });
+      var opts = Object.assign({}, base, {
+        scales: {
+          x: base.scales.x,
+          y: Object.assign({}, base.scales.y, { display: temLucro, position: 'left', beginAtZero: true }),
+          y1: { beginAtZero: true, position: temLucro ? 'right' : 'left', grid: { display: !temLucro, color: cssVar('--line') }, border: { display: false }, ticks: { color: cssVar('--muted'), precision: 0 } }
+        }
+      });
+      opts.plugins = Object.assign({}, base.plugins, { tooltip: Object.assign({}, base.plugins.tooltip, { callbacks: { label: function (c) {
+        return ' ' + c.dataset.label + ': ' + (c.dataset.label === 'Unidades' ? c.parsed.y + ' un.' + (hist[c.dataIndex].precoMedio ? ' a ' + fmtMoney(hist[c.dataIndex].precoMedio) : '') : fmtMoney(c.parsed.y));
+      } } }) });
+      novoGrafico(cv, { data: { labels: labels, datasets: ds }, options: opts });
+    }, 0);
+
+    // ---- Simulador de desconto / campanha ----
+    card.appendChild(el('h4', { class: 'ficha-sub', text: 'E se eu der desconto?' }));
+    var saida = el('div', { class: 'sim-saida' });
+    var rotulo = el('b', { text: state.simDesconto + '%' });
+    var faixa = el('input', { type: 'range', min: '0', max: '50', step: '1', value: state.simDesconto, 'aria-label': 'Desconto em porcentagem' });
+    function atualizar() {
+      var d = Number(faixa.value);
+      state.simDesconto = d;
+      rotulo.textContent = d + '%';
+      saida.innerHTML = '';
+      var s = simularDesconto(g, d / 100);
+      if (!s) return;
+      var linhas = [
+        ['Preço', fmtMoney(s.atual.preco), fmtMoney(s.novo.preco)],
+        ['Taxas da plataforma', fmtMoney(s.atual.taxas), fmtMoney(s.novo.taxas)],
+        ['Você recebe', fmtMoney(s.atual.recebido), fmtMoney(s.novo.recebido)],
+        ['Lucro por unidade', s.atual.lucro === null ? '—' : fmtMoney(s.atual.lucro), s.novo.lucro === null ? '—' : fmtMoney(s.novo.lucro)],
+        ['Margem', fmtPct(s.atual.margem), fmtPct(s.novo.margem)]
+      ];
+      var t = el('table', { class: 'pml-table' }, [el('tr', {}, [el('th', { text: '' }), el('th', { class: 'num', text: 'Hoje' }), el('th', { class: 'num', text: 'Com ' + d + '% off' })])]);
+      linhas.forEach(function (l) { t.appendChild(el('tr', {}, [el('td', { text: l[0] }), el('td', { class: 'num', text: l[1] }), el('td', { class: 'num', style: 'font-weight:700;', text: l[2] })])); });
+      saida.appendChild(t);
+      var msg;
+      if (s.novo.lucro === null) msg = '✏️ Cadastre o custo deste produto para ver se o desconto compensa.';
+      else if (s.novo.lucro <= 0) msg = '🔴 <b>Com ' + d + '% de desconto você paga para vender.</b> O desconto máximo sem prejuízo é <b>' + fmtPct(s.descontoMaximo) + '</b>.';
+      else if (s.vendasAMais !== null) msg = '📈 Para lucrar o mesmo, você precisa vender <b>' + fmtPct(s.vendasAMais) + ' a mais</b> (' + Math.ceil(g.unidades * (1 + s.vendasAMais)) + ' un. em vez de ' + g.unidades + ' no mesmo período). Desconto máximo sem prejuízo: <b>' + fmtPct(s.descontoMaximo) + '</b>.';
+      else msg = 'Desconto máximo sem prejuízo: <b>' + fmtPct(s.descontoMaximo) + '</b>.';
+      saida.appendChild(el('div', { class: 'pml-dica', style: 'margin-top:12px;', html: msg }));
+    }
+    faixa.addEventListener('input', atualizar);
+    card.appendChild(el('div', { class: 'sim-faixa' }, [el('span', { text: 'Desconto' }), faixa, rotulo]));
+    card.appendChild(saida);
+    card.appendChild(el('p', { class: 'pml-note', text: 'Estimativa com as taxas reais das suas vendas: mantém a mesma % de comissão, o mesmo frete por unidade' + (g.plataforma === 'shopee' ? ' e a taxa fixa por pedido da Shopee (Calculadora 3D → Plataformas)' : '') + '. No Mercado Livre, se o preço cair abaixo de R$ 79 o frete e a tarifa fixa mudam.' }));
+    atualizar();
+
+    // ---- Ads deste anuncio ----
+    var ads = calcAdsPorProduto();
+    var a = ads && ads.linhas.find(function (x) { return mesmoItem(x.itemId, id); });
+    if (a) {
+      var dec = DECISAO_ADS[a.decisao];
+      card.appendChild(el('h4', { class: 'ficha-sub', text: 'Shopee Ads (' + ads.dias + ' dias)' }));
+      card.appendChild(el('div', { class: 'pml-dica', html: 'Gastou <b>' + fmtMoney(a.gasto) + '</b> e trouxe <b>' + fmtMoney(a.vendasAds) + '</b> em ' + a.pedidosAds + ' pedido(s). O Ads levou <b>' + fmtPct(a.acos) + '</b> de cada venda; sua margem antes do Ads é ' + fmtPct(a.margem) + '. <span class="pml-tag ' + dec.tag + '">' + dec.texto + '</span><br>' + dec.dica }));
+    }
+    wrap.appendChild(card);
+  }
+
+  function metricaFicha(rotulo, valor, sub, classe) {
+    return el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: rotulo }), el('p', { class: 'pml-metric-value ' + (classe || ''), text: valor }), el('p', { class: 'pml-margin', text: sub || '' })]);
+  }
+
+  function renderAdsPorProduto(wrap) {
+    var ads = calcAdsPorProduto();
+    if (!ads) return;
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Shopee Ads por produto (' + ads.dias + ' dias)' }));
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { class: 'num', text: 'Lucro depois do Ads' }), el('th', { text: 'O que fazer' })]));
+    var economia = 0;
+    ads.linhas.forEach(function (a) {
+      var dec = DECISAO_ADS[a.decisao];
+      if (a.decisao === 'pausar') economia += a.gasto;
+      t.appendChild(el('tr', { class: a.decisao === 'pausar' ? 'pml-row-alerta' : '' }, [
+        el('td', {}, [el('button', { class: 'pml-link-prod', title: 'Abrir a ficha do produto', text: a.titulo, onclick: function () { state.tab = 'lucro'; abrirFichaProduto(a.itemId); } })]),
+        el('td', { class: 'num', text: fmtMoney(a.gasto) }),
+        el('td', { class: 'num', text: fmtMoney(a.vendasAds) + ' · ' + a.pedidosAds + ' ped.' }),
+        el('td', { class: 'num', text: fmtPct(a.acos) }),
+        el('td', { class: 'num', text: fmtPct(a.margem) }),
+        el('td', { class: 'num', style: a.lucroDepois !== null && a.lucroDepois < 0 ? 'color:var(--bad); font-weight:700;' : '', text: a.lucroDepois === null ? '—' : fmtMoney(a.lucroDepois) }),
+        el('td', { title: dec.dica }, [el('span', { class: 'pml-tag ' + dec.tag, style: 'margin-left:0;', text: dec.texto })])
+      ]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    if (economia > 0) card.appendChild(el('div', { class: 'pml-dica', style: 'margin-top:12px;', html: '💡 Os anúncios marcados para pausar gastaram <b>' + fmtMoney(economia) + '</b> em ' + ads.dias + ' dias sem dar lucro.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Ads levou</b> = gasto ÷ vendas que vieram do Ads (ACOS). Se for maior que a <b>margem</b> do produto, cada venda pelo Ads dá prejuízo. Regra: Ads abaixo da metade da margem → aumentar; entre metade e a margem → manter; acima → pausar ou baixar o lance. Campanha com vários anúncios é dividida igualmente entre eles.' }));
+    wrap.appendChild(card);
+  }
+
+  function renderReposicaoCard(wrap) {
+    var cfg = state.configLucro;
+    var prazo = Number(cfg.prazoReposicao) || 10;
+    var lista = calcReposicao(prazo, 30);
+    var fil = calcFilamento();
+    if (!lista.length && !fil) return;
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Reposição' }));
+    var inpPrazo = el('input', { type: 'number', min: '1', step: '1', value: prazo, style: 'width:80px;', onchange: function () { cfg.prazoReposicao = Number(inpPrazo.value) || 10; salvarConfigLucro(); render(); } });
+    card.appendChild(el('div', { class: 'pml-field', style: 'max-width:340px; margin-bottom:12px;' }, [el('label', { text: 'Quantos dias o fornecedor leva para entregar' }), inpPrazo]));
+
+    if (fil) {
+      var txt = '🧵 <b>Filamento:</b> ';
+      txt += fil.fonte === 'vendas' ? 'pelas vendas dos últimos 30 dias você gasta cerca de <b>' + fil.kgMesVendas.toFixed(1).replace('.', ',') + ' kg por mês</b>.' : 'pelo ritmo das suas compras, você usa cerca de <b>' + fil.kgMesCompra.toFixed(1).replace('.', ',') + ' kg por mês</b>.';
+      if (fil.proximaCompra) txt += ' A última compra (' + fil.kgUltimo + ' kg em ' + fil.ultimaCompra.toLocaleDateString('pt-BR') + ') deve durar até <b>' + fil.proximaCompra.toLocaleDateString('pt-BR') + '</b>' + (fil.diasAteProxima <= prazo ? ' — <b style="color:var(--bad)">hora de pedir mais</b>.' : '.');
+      if (fil.fonte === 'compras') txt += '<br><span class="pml-margin">Fica mais preciso quando cada peça da Calculadora 3D tiver os gramas e o código do anúncio.</span>';
+      card.appendChild(el('div', { class: 'pml-dica', style: 'margin-bottom:14px;', html: txt }));
+    }
+
+    if (lista.length) {
+      var nomes = { urgente: ['prejuizo', 'comprar já'], logo: ['baixa', 'comprar logo'], ok: ['boa', 'tranquilo'], parado: ['baixa', 'sem vendas'] };
+      var t = el('table', { class: 'pml-table' });
+      t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Estoque' }), el('th', { class: 'num', text: 'Vende por dia' }), el('th', { class: 'num', text: 'Dura até' }), el('th', { class: 'num', text: 'Comprar' }), el('th', { text: '' })]));
+      lista.forEach(function (r) {
+        var n = nomes[r.situacao];
+        t.appendChild(el('tr', { class: r.situacao === 'urgente' ? 'pml-row-alerta' : (r.situacao === 'logo' ? 'pml-row-atencao' : '') }, [
+          el('td', { text: r.produto.nome }),
+          el('td', { class: 'num', text: String(r.estoque) }),
+          el('td', { class: 'num', text: r.porDia ? r.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
+          el('td', { class: 'num', text: r.acabaEm ? r.acabaEm.toLocaleDateString('pt-BR') + ' (' + Math.round(r.cobertura) + ' d)' : '—' }),
+          el('td', { class: 'num', style: 'font-weight:700;', text: r.comprar ? r.comprar + ' un.' : '—' }),
+          el('td', {}, [el('span', { class: 'pml-tag ' + n[0], style: 'margin-left:0;', text: n[1] })])
+        ]));
+      });
+      card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+      card.appendChild(el('p', { class: 'pml-note', text: 'Usa a quantidade cadastrada abaixo (ela já baixa sozinha a cada venda) e a média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
+    } else {
+      card.appendChild(el('p', { class: 'pml-note', text: 'Para ver quando cada produto acaba, cadastre abaixo a quantidade em estoque e o código do anúncio.' }));
+    }
+    wrap.appendChild(card);
+  }
+  // ===================== RELATORIO DO MES =====================
+  // Nota da loja, problemas e oportunidades em R$ e plano para os proximos 30 dias.
+
+  function intervaloMes(mes) {
+    var p = mes.split('-'), ano = Number(p[0]), m = Number(p[1]);
+    var fim = new Date(ano, m, 0).getDate();
+    return { de: mes + '-01', ate: mes + '-' + String(fim).padStart(2, '0'), diasNoMes: fim };
+  }
+
+  function mesAnteriorDe(mes) {
+    var p = mes.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 2, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function mesesComVendas() {
+    var m = {};
+    state.transacoes.forEach(function (t) { if (t.tipo === 'venda' && t.data) m[t.data.slice(0, 7)] = true; });
+    return Object.keys(m).sort().reverse();
+  }
+
+  function curto(t) {
+    t = String(t || '');
+    if (t.length <= 48) return t;
+    return t.slice(0, 48).replace(/\s+\S*$/, '') + '…';
+  }
+
+  function vendasDoMes(mes) {
+    var r = { total: 0, pedidos: 0, plat: {} };
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || (t.data || '').slice(0, 7) !== mes) return;
+      var v = Number(t.valor) || 0, p = plataformaDe(t);
+      r.total += v; r.pedidos++; r.plat[p] = (r.plat[p] || 0) + v;
+    });
+    return r;
+  }
+
+  function calcRelatorioMes(mes, agora) {
+    agora = agora || new Date();
+    var iv = intervaloMes(mes);
+    var hoje = isoDia(agora);
+    var emAndamento = hoje >= iv.de && hoje <= iv.ate;
+    var vendas = vendasDoMes(mes);
+    var anterior = vendasDoMes(mesAnteriorDe(mes));
+    // So compara com o mes anterior se os dados cobrem o mes anterior inteiro
+    var primeiraVenda = state.transacoes.reduce(function (m, t) { return t.tipo === 'venda' && t.data && t.data < m ? t.data : m; }, '9999');
+    anterior.completo = primeiraVenda <= mesAnteriorDe(mes) + '-01';
+    if (!anterior.completo) anterior.total = 0;
+    var proj = emAndamento ? calcProjecaoMes(vendas.total, agora).projecao : vendas.total;
+    var imp = (Number(state.configLucro.imposto) || 0) / 100;
+    var alvo = (Number(state.configLucro.margemAlvo) || 0) / 100;
+    var linhas = calcLucroPorProduto(0, 'todas', iv).linhas;
+    var tot = linhas.reduce(function (a, g) {
+      a.receita += g.receita;
+      if (g.lucro !== null) { a.lucro += g.lucro; a.receitaComCusto += g.receita; } else { a.receitaSemCusto += g.receita; a.semCusto.push(g); }
+      if (g.lucro !== null && g.lucro < 0) a.prejuizo.push(g);
+      return a;
+    }, { receita: 0, lucro: 0, receitaComCusto: 0, receitaSemCusto: 0, semCusto: [], prejuizo: [] });
+    var ads = (state.adsShopee && state.adsShopee.dias || []).reduce(function (a, d) {
+      if (d.data >= iv.de && d.data <= iv.ate) { a.gasto += Number(d.gasto) || 0; a.vendas += Number(d.vendas_ads) || 0; a.dias++; }
+      return a;
+    }, { gasto: 0, vendas: 0, dias: 0 });
+    // Ads proporcional a parte das vendas que tem custo (o resto nao entra no lucro)
+    var lucroAposAds = tot.lucro - ads.gasto * (tot.receita ? tot.receitaComCusto / tot.receita : 0);
+    var margem = tot.receitaComCusto ? lucroAposAds / tot.receitaComCusto : null;
+
+    // ---- Problemas e oportunidades (em R$ por mes) ----
+    var itens = [];
+    tot.prejuizo.forEach(function (g) {
+      itens.push({ valor: -g.lucro, tipo: 'prejuizo', texto: '<b>' + g.titulo + '</b> deu ' + fmtMoney(-g.lucro) + ' de prejuízo (' + g.unidades + ' un.).', acao: 'Suba o preço de ' + curto(g.titulo) + ' ou pague no máximo ' + fmtMoney(Math.max(0, g.maxCompra || 0)) + ' na próxima compra.' });
+    });
+    var adsProd = calcAdsPorProduto();
+    if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'pausar'; }).forEach(function (a) {
+      itens.push({ valor: a.gasto, tipo: 'ads', texto: 'Shopee Ads de <b>' + a.titulo + '</b> gastou ' + fmtMoney(a.gasto) + ' nos últimos ' + adsProd.dias + ' dias, com o Ads levando ' + fmtPct(a.acos) + ' de cada venda (margem ' + fmtPct(a.margem) + ').', acao: 'Pause ou baixe o lance do Ads de ' + curto(a.titulo) + '.' });
+    });
+    var fat = state.faturamento && (state.faturamento.periodos || []).find(function (p) { return String(p.chave || '').slice(0, 7) === mes; });
+    if (fat) {
+      var antecip = (fat.linhas || []).filter(function (l) { return l.categoria === 'Antecipação'; }).reduce(function (s, l) { return s + l.valor; }, 0);
+      if (antecip > 0) itens.push({ valor: antecip, tipo: 'antecipacao', texto: 'Na fatura ' + fat.chave.slice(0, 7) + ' do ML você pagou <b>' + fmtMoney(antecip) + '</b> para receber o dinheiro antes do prazo.', acao: 'Desligue a antecipação automática no Mercado Pago e antecipe só quando precisar.' });
+    }
+    linhas.filter(function (g) { return g.receita > 0 && g.taxasMl / g.receita > 0.4 && g.lucro !== null && g.lucro >= 0; }).forEach(function (g) {
+      itens.push({ valor: 0, tipo: 'taxa', texto: 'A plataforma ficou com <b>' + fmtPct(g.taxasMl / g.receita) + '</b> das vendas de ' + g.titulo + '.', acao: 'Revise o preço ou o tipo de anúncio de ' + curto(g.titulo) + ' (taxa acima de 40%).' });
+    });
+    itens.sort(function (a, b) { return b.valor - a.valor; });
+    var emJogo = itens.reduce(function (s, i) { return s + i.valor; }, 0);
+
+    // ---- Nota de 0 a 10 (cada desconto aparece na tela) ----
+    var fatores = [];
+    if (margem !== null && margem < alvo) fatores.push({ pontos: -Math.min(4, (alvo - margem) * 20), texto: 'margem de ' + fmtPct(margem) + ' abaixo da meta de ' + fmtPct(alvo) });
+    if (tot.prejuizo.length) fatores.push({ pontos: -Math.min(2, tot.prejuizo.length * 0.5), texto: tot.prejuizo.length + ' produto(s) com prejuízo' });
+    if (tot.receita && tot.receitaSemCusto / tot.receita > 0.1) fatores.push({ pontos: -2 * tot.receitaSemCusto / tot.receita, texto: fmtPct(tot.receitaSemCusto / tot.receita) + ' do faturamento sem custo cadastrado' });
+    if (anterior.total && proj !== null && proj < anterior.total * 0.9) fatores.push({ pontos: -1, texto: 'vendas ' + (emAndamento ? 'projetadas ' : '') + fmtPct(proj / anterior.total - 1) + ' em relação ao mês anterior' });
+    if (ads.gasto && ads.vendas && ads.gasto / ads.vendas > 0.15) fatores.push({ pontos: -1, texto: 'Shopee Ads levando ' + fmtPct(ads.gasto / ads.vendas) + ' das vendas que trouxe' });
+    var nota = Math.max(0, Math.min(10, 10 + fatores.reduce(function (s, f) { return s + f.pontos; }, 0)));
+
+    var destaques = linhas.filter(function (g) { return g.lucro !== null && g.lucro > 0; }).sort(function (a, b) { return b.lucro - a.lucro; }).slice(0, 5);
+    var plano = itens.slice(0, 6).map(function (i) { return i.acao; });
+    if (tot.semCusto.length) plano.push('Cadastre o custo de ' + tot.semCusto.length + ' produto(s) na aba Lucro real (' + fmtMoney(tot.receitaSemCusto) + ' em vendas sem lucro conhecido).');
+    if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'aumentar'; }).slice(0, 2).forEach(function (a) { plano.push('Aumente o orçamento do Ads de ' + curto(a.titulo) + ': o Ads leva ' + fmtPct(a.acos) + ' e a margem é ' + fmtPct(a.margem) + '.'); });
+    if (destaques[0]) plano.push('Garanta estoque de ' + curto(destaques[0].titulo) + ', o produto que mais deu lucro (' + fmtMoney(destaques[0].lucro) + ').');
+
+    return {
+      mes: mes, emAndamento: emAndamento, vendas: vendas, anterior: anterior, projecao: proj, lucro: tot.lucro, lucroAposAds: lucroAposAds,
+      receitaComCusto: tot.receitaComCusto, receitaSemCusto: tot.receitaSemCusto, margem: margem, ads: ads,
+      nota: Math.round(nota * 10) / 10, fatores: fatores, itens: itens, emJogo: emJogo, destaques: destaques, plano: plano
+    };
+  }
+
+  function renderRelatorioTab(wrap) {
+    var meses = mesesComVendas();
+    if (!meses.length) { wrap.appendChild(el('div', { class: 'pml-card' }, [el('div', { class: 'pml-empty', text: 'O relatório aparece quando houver vendas sincronizadas.' })])); return; }
+    var mes = meses.indexOf(state.relMes) !== -1 ? state.relMes : meses[0];
+    var r = calcRelatorioMes(mes);
+    function nomeMes(m) { var p = m.split('-'); var s = new Date(Number(p[0]), Number(p[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    var sel = el('select', { onchange: function () { state.relMes = sel.value; render(); } }, meses.map(function (m) { var o = el('option', { value: m, text: nomeMes(m) }); if (m === mes) o.setAttribute('selected', ''); return o; }));
+    var topo = el('div', { class: 'rel-topo' }, [
+      el('div', {}, [el('h2', { text: 'Relatório de ' + nomeMes(mes) }), el('p', { class: 'pml-margin', text: r.emAndamento ? 'Mês em andamento: números até hoje, com projeção para o mês inteiro.' : 'Mês fechado.' })]),
+      el('div', { class: 'rel-acoes' }, [sel, el('button', { class: 'pml-btn', text: 'Salvar em PDF', onclick: function () { window.print(); } })])
+    ]);
+    wrap.appendChild(topo);
+
+    var notaCls = r.nota >= 8 ? 'pos' : (r.nota >= 5 ? '' : 'neg');
+    var cardNota = el('div', { class: 'pml-card rel-nota' }, [
+      el('div', { class: 'rel-nota-num ' + notaCls, text: r.nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }),
+      el('div', {}, [
+        el('p', { class: 'pml-section-title', style: 'margin:0 0 6px;', text: 'Nota da loja' }),
+        el('div', { class: 'pml-margin', html: r.fatores.length ? 'Começa em 10 e perde pontos por: ' + r.fatores.map(function (f) { return f.texto + ' (' + f.pontos.toFixed(1).replace('.', ',') + ')'; }).join('; ') + '.' : 'Nada puxou a nota para baixo neste mês. 👏' })
+      ])
+    ]);
+    wrap.appendChild(cardNota);
+
+    var variacao = r.anterior.total ? (r.emAndamento ? r.projecao : r.vendas.total) / r.anterior.total - 1 : null;
+    wrap.appendChild(el('div', { class: 'pml-metrics' }, [
+      metricaFicha('Faturamento', fmtMoney(r.vendas.total), r.vendas.pedidos + ' pedidos' + (r.emAndamento && r.projecao ? ' · projeção ' + fmtMoney(r.projecao) : '')),
+      metricaFicha('Contra o mês anterior', variacao === null ? '—' : (variacao >= 0 ? '+' : '') + fmtPct(variacao), r.anterior.total ? 'mês anterior: ' + fmtMoney(r.anterior.total) : (r.anterior.completo ? 'sem vendas no mês anterior' : 'o painel ainda não tem o mês anterior inteiro'), variacao === null ? '' : (variacao >= 0 ? 'pos' : 'neg')),
+      metricaFicha('Lucro real', r.receitaComCusto ? fmtMoney(r.lucroAposAds) : '—', r.receitaComCusto ? 'margem ' + fmtPct(r.margem) + ', já sem imposto e Ads (produtos com custo)' : 'cadastre os custos para ver', r.receitaComCusto ? (r.lucroAposAds >= 0 ? 'pos' : 'neg') : ''),
+      metricaFicha('Shopee Ads', fmtMoney(r.ads.gasto), r.ads.gasto ? 'trouxe ' + fmtMoney(r.ads.vendas) + (r.ads.dias < intervaloMes(mes).diasNoMes && !r.emAndamento ? ' (só ' + r.ads.dias + ' dias com dados)' : '') : 'sem gasto registrado')
+    ]));
+
+    var cardProb = el('div', { class: 'pml-card' });
+    cardProb.appendChild(el('p', { class: 'pml-section-title', text: r.emJogo > 0 ? 'Problemas e oportunidades: ' + fmtMoney(r.emJogo) + ' em jogo' : 'Problemas e oportunidades' }));
+    if (!r.itens.length) cardProb.appendChild(el('div', { class: 'pml-empty', text: 'Nenhum vazamento encontrado com os dados que existem.' }));
+    r.itens.forEach(function (i) {
+      cardProb.appendChild(el('div', { class: 'rel-item' }, [el('span', { class: 'rel-valor', text: i.valor > 0 ? fmtMoney(i.valor) : '—' }), el('span', { html: i.texto })]));
+    });
+    if (r.receitaSemCusto > 0) cardProb.appendChild(el('p', { class: 'pml-note', text: fmtMoney(r.receitaSemCusto) + ' em vendas de produtos sem custo cadastrado ficaram fora destas contas.' }));
+    wrap.appendChild(cardProb);
+
+    if (r.destaques.length) {
+      var cardTop = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Quem mais deu lucro' })]);
+      r.destaques.forEach(function (g, k) {
+        cardTop.appendChild(el('div', { class: 'rel-item' }, [el('span', { class: 'rel-valor', style: 'color:var(--good);', text: fmtMoney(g.lucro) }), el('span', { text: (k + 1) + '. ' + g.titulo + ' · ' + g.unidades + ' un. · margem ' + fmtPct(g.margem) })]));
+      });
+      wrap.appendChild(cardTop);
+    }
+
+    var cardPlano = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Plano para os próximos 30 dias' })]);
+    var ol = el('ol', { class: 'rel-plano' });
+    (r.plano.length ? r.plano : ['Continue assim: nenhum ajuste urgente apareceu nos dados.']).forEach(function (p) { ol.appendChild(el('li', { text: p })); });
+    cardPlano.appendChild(ol);
+    wrap.appendChild(cardPlano);
+  }
   function render() {
     destruirGraficos();
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' ? ' largo' : '') });
     renderHeader(wrap);
     renderTabs(wrap);
     if (!state.loaded) {
@@ -2674,6 +3231,8 @@
       renderLucroTab(wrap);
     } else if (state.tab === 'calc3d') {
       renderCalc3dTab(wrap);
+    } else if (state.tab === 'relatorio') {
+      renderRelatorioTab(wrap);
     } else if (state.tab === 'financeiro') {
       renderFinanceiroTab(wrap);
     } else {
@@ -2682,6 +3241,10 @@
     }
     root.appendChild(wrap);
   }
+
+  // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
+  var abaDoLink = (location.hash || '').replace('#', '');
+  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   mostrarIntro();
   loadData();

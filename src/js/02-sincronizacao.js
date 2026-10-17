@@ -86,6 +86,11 @@
   async function sincronizarFaturamento() {
     if (!state.gistUrl) return;
     try {
+      // status.json: hora da ultima execucao da automacao (a fatura so atualiza a cada 6 h)
+      var rs = await fetch(urlArquivoIrmao(state.gistUrl, 'status.json') + '?_=' + Date.now());
+      if (rs.ok) { var st = await rs.json(); if (st && st.atualizado_em) state.statusAuto = st; }
+    } catch (e) {}
+    try {
       var r = await fetch(urlArquivoIrmao(state.gistUrl, 'faturamento.json') + '?_=' + Date.now());
       if (!r.ok) return;
       var dados = await r.json();

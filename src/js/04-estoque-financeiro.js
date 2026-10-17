@@ -1,4 +1,5 @@
   function renderEstoqueTab(wrap) {
+    renderReposicaoCard(wrap);
     var formError = el('div', { class: 'pml-error', style: 'display:none' });
     var card = el('div', { class: 'pml-card' });
     card.appendChild(el('p', { class: 'pml-section-title', text: 'Adicionar produto' }));

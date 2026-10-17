@@ -14,6 +14,9 @@
  "src/js/10-lucro-calculos.js",
  "src/js/11-lucro-tela.js",
  "src/js/13-metas-calor-backup.js",
+ "src/js/14-produto-calculos.js",
+ "src/js/15-produto-tela.js",
+ "src/js/16-relatorio.js",
  "src/js/12-render.js",
  "src/fim.html"
 ]

@@ -1,7 +1,7 @@
   function render() {
     destruirGraficos();
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' ? ' largo' : '') });
     renderHeader(wrap);
     renderTabs(wrap);
     if (!state.loaded) {
@@ -28,6 +28,8 @@
       renderLucroTab(wrap);
     } else if (state.tab === 'calc3d') {
       renderCalc3dTab(wrap);
+    } else if (state.tab === 'relatorio') {
+      renderRelatorioTab(wrap);
     } else if (state.tab === 'financeiro') {
       renderFinanceiroTab(wrap);
     } else {
@@ -36,6 +38,10 @@
     }
     root.appendChild(wrap);
   }
+
+  // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
+  var abaDoLink = (location.hash || '').replace('#', '');
+  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   mostrarIntro();
   loadData();
