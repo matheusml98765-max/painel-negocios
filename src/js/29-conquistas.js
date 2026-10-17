@@ -76,6 +76,15 @@
     }
 
     var investido = itens.reduce(function (s, c) { return s + (Number(c.valor) || 0); }, 0);
+    // Marcos que as vendas reais ja bateram
+    var marcos = [];
+    [100, 250, 500, 1000, 2000, 3000, 5000, 10000].forEach(function (n) { if (r.pedidos >= n) marcos.push({ icone: '📦', titulo: n.toLocaleString('pt-BR') + ' pedidos registrados no painel' }); });
+    [10000, 25000, 50000, 100000, 250000, 500000, 1000000].forEach(function (n) { if (r.total >= n) marcos.push({ icone: '💰', titulo: fmtMoney(n).replace(',00', '') + ' em vendas' }); });
+    if (marcos.length) {
+      var mc = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Marcos batidos (pelas vendas)' })]);
+      mc.appendChild(el('div', { style: 'display:flex; flex-wrap:wrap; gap:8px;' }, marcos.slice(-6).reverse().map(function (m) { return el('span', { class: 'pml-badge venda', style: 'font-size:13px; padding:6px 10px;', text: m.icone + ' ' + m.titulo }); })));
+      wrap.appendChild(mc);
+    }
     var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Suas conquistas' + (investido ? ' · ' + fmtMoney(investido) + (itens.some(function (c) { return c.mais; }) ? ' ou mais' : '') + ' conquistados' : '') })]);
     if (!itens.length) card.appendChild(el('div', { class: 'pml-empty', text: 'Me conte suas conquistas pelo chat que eu coloco aqui.' }));
     itens.forEach(function (c) {

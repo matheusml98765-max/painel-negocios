@@ -7,9 +7,13 @@
     var local = lerLocal('ml-receber-local', { novos: [], recebidos: {}, desfeitos: {}, excluidos: {} });
     ['recebidos', 'desfeitos', 'excluidos'].forEach(function (k) { if (!local[k]) local[k] = {}; });
     if (!local.novos) local.novos = [];
+    var mes = isoHoje(0).slice(0, 7);
+    // Valor mensal (ex.: a mae passa todo mes): o "recebido" vale so para o mes atual
     var itens = (remoto.itens || []).concat(local.novos).filter(function (x) { return !local.excluidos[x.id]; }).map(function (x) {
-      var rec = local.desfeitos[x.id] ? null : (local.recebidos[x.id] || x.recebido_em || null);
-      return Object.assign({}, x, { recebido: rec });
+      var chave = x.mensal ? x.id + ':' + mes : x.id;
+      var rec = local.desfeitos[chave] ? null : (local.recebidos[chave] || (x.mensal ? (x.recebidos || {})[mes] : x.recebido_em) || null);
+      var prev = x.mensal && x.dia ? mes + '-' + String(x.dia).padStart(2, '0') : x.previsao;
+      return Object.assign({}, x, { recebido: rec, chave: chave, previsao: prev });
     });
     return { local: local, itens: itens };
   }
@@ -37,12 +41,12 @@
     if (!pend.length) lista.appendChild(el('div', { class: 'pml-empty', text: 'Ninguém te deve nada. 🎉' }));
     function linha(x) {
       var atrasado = !x.recebido && x.previsao && x.previsao < hoje;
-      var info = [x.descricao, x.criado ? 'desde ' + x.criado.split('-').reverse().join('/') : null,
+      var info = [x.descricao, x.mensal ? 'todo mês' : null, !x.mensal && x.criado ? 'desde ' + x.criado.split('-').reverse().join('/') : null,
         x.previsao ? (atrasado ? '<b style="color:var(--bad)">combinado para ' : 'combinado para ') + x.previsao.split('-').reverse().join('/') + (atrasado ? '</b>' : '') : null,
         x.recebido ? 'recebido em ' + x.recebido.split('-').reverse().join('/') : null].filter(Boolean).join(' · ');
       return el('div', { class: 'tarefa' + (x.recebido ? ' feita' : '') }, [
         el('button', { class: 'tarefa-check', title: x.recebido ? 'Desmarcar' : 'Marcar como recebido', text: x.recebido ? '✓' : '', onclick: function () {
-          if (x.recebido) { delete D.local.recebidos[x.id]; D.local.desfeitos[x.id] = true; } else { D.local.recebidos[x.id] = hoje; delete D.local.desfeitos[x.id]; }
+          if (x.recebido) { delete D.local.recebidos[x.chave]; D.local.desfeitos[x.chave] = true; } else { D.local.recebidos[x.chave] = hoje; delete D.local.desfeitos[x.chave]; }
           salvar();
         } }),
         el('div', { class: 'tarefa-texto' }, [el('div', { class: 'tarefa-titulo', text: x.quem }), info ? el('div', { class: 'pml-margin', html: info }) : null].filter(Boolean)),
