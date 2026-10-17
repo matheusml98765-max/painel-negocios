@@ -133,7 +133,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['tarefas', 'Tarefas'], ['cpf', 'CPF'], ['importar', 'Importar']].forEach(function (t) {
+    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['cpf', 'CPF'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],

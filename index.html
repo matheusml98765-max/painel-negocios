@@ -343,7 +343,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana' };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -775,7 +775,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['tarefas', 'Tarefas'], ['cpf', 'CPF'], ['importar', 'Importar']].forEach(function (t) {
+    [['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['cpf', 'CPF'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],
@@ -3631,7 +3631,7 @@
 
   async function sincronizarTarefasCpf() {
     if (!state.gistUrl) return;
-    var pares = [['tarefas.json', 'tarefasRemotas', 'ml-tarefas-remotas'], ['financas_cpf.json', 'cpfRemoto', 'ml-cpf-remoto']];
+    var pares = [['tarefas.json', 'tarefasRemotas', 'ml-tarefas-remotas'], ['financas_cpf.json', 'cpfRemoto', 'ml-cpf-remoto'], ['contas.json', 'contasRemotas', 'ml-contas-remotas']];
     for (var i = 0; i < pares.length; i++) {
       try {
         var r = await fetch(urlArquivoIrmao(state.gistUrl, pares[i][0]) + '?_=' + Date.now());
@@ -3855,7 +3855,7 @@
     return rot + ' (' + f(seg) + ' a ' + f(fim.toISOString().slice(0, 10)) + ')';
   }
 
-  function nomeMes(m) {
+  function nomeMesCurto(m) {
     var n = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     return n[Number(m.slice(5, 7)) - 1] + '/' + m.slice(0, 4);
   }
@@ -3882,7 +3882,7 @@
     // Ultima semana (ou mes) com compras: cada compra e a comparacao dela
     var atual = grupos[0], anterior = grupos[1];
     var saldoAtual = atual.aMais - atual.aMenos;
-    var frase = (visao === 'semana' ? nomeSemana(atual.mes) : nomeMes(atual.mes)) + ': ' + atual.compras + (atual.compras === 1 ? ' compra, ' : ' compras, ') + fmtMoney(atual.gasto) + '. ' +
+    var frase = (visao === 'semana' ? nomeSemana(atual.mes) : nomeMesCurto(atual.mes)) + ': ' + atual.compras + (atual.compras === 1 ? ' compra, ' : ' compras, ') + fmtMoney(atual.gasto) + '. ' +
       (atual.aMais || atual.aMenos ? (saldoAtual > 0.005 ? 'Pagou ' + fmtMoney(saldoAtual) + ' a mais que antes.' : saldoAtual < -0.005 ? 'Saiu ' + fmtMoney(-saldoAtual) + ' mais barato que antes.' : 'Mesmo preço de antes.') : 'Sem compra anterior para comparar.');
     if (anterior) {
       var saldoAnt = anterior.aMais - anterior.aMenos;
@@ -3897,7 +3897,7 @@
       el('tbody', {}, grupos.map(function (m) {
         var saldo = m.aMais - m.aMenos;
         return el('tr', {}, [
-          el('td', { text: visao === 'semana' ? nomeSemana(m.mes) : nomeMes(m.mes) }), el('td', { text: String(m.compras) }),
+          el('td', { text: visao === 'semana' ? nomeSemana(m.mes) : nomeMesCurto(m.mes) }), el('td', { text: String(m.compras) }),
           el('td', { class: 'num', text: fmtMoney(m.gasto) }),
           el('td', { class: 'num', style: m.aMais ? 'color:var(--bad);' : '', text: m.aMais ? fmtMoney(m.aMais) : '—' }),
           el('td', { class: 'num', style: m.aMenos ? 'color:var(--good);' : '', text: m.aMenos ? fmtMoney(m.aMenos) : '—' }),
@@ -3935,10 +3935,245 @@
       }))
     ])]);
   }
+  // ===================== CONTAS A PAGAR: CALCULOS =====================
+  // Contas fixas (todo mes), parcelas (N vezes), compras no cartao (entram na fatura do cartao)
+  // e o imposto do Simples (estimado pelas vendas do mes anterior, vence dia 20).
+  // Fonte: contas.json no Gist (o Claude lanca pelo chat) + o que o vendedor faz aqui.
+  //
+  // contas.json = {
+  //   contas: [{ id, tipo: 'fixa'|'parcela', nome, valor, dia, de: 'empresa'|'cpf', categoria,
+  //              forma: 'Pix'|'Boleto'|'Débito'|<nome do cartao>, inicio: 'AAAA-MM', fim: 'AAAA-MM'|null,
+  //              parcelas (so parcela), primeira: 'AAAA-MM' (so parcela), aproximado: bool, obs }],
+  //   cartoes: [{ id, nome, vencimento (dia), fechamento (dia), de }],
+  //   pagos: { '<id>:<AAAA-MM>': 'AAAA-MM-DD' }
+  // }
+
+  function difMeses(a, b) { // meses de a ate b (AAAA-MM)
+    return (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
+  }
+  function somaMes(m, n) {
+    var d = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function diaNoMes(m, dia) { // dia 31 em fevereiro vira o ultimo dia
+    var ult = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate();
+    return m + '-' + String(Math.min(Math.max(1, Number(dia) || 1), ult)).padStart(2, '0');
+  }
+
+  function dadosContas() {
+    var remoto = state.contasRemotas || lerLocal('ml-contas-remotas', null) || {};
+    var local = lerLocal('ml-contas-local', { pagos: {}, despagos: {}, novas: [], excluidas: {} });
+    ['pagos', 'despagos', 'excluidas'].forEach(function (k) { if (!local[k]) local[k] = {}; });
+    if (!local.novas) local.novas = [];
+    var contas = (remoto.contas || []).concat(local.novas).filter(function (c) { return !local.excluidas[c.id]; });
+    return { local: local, contas: contas, cartoes: remoto.cartoes || [], pagosRemotos: remoto.pagos || {} };
+  }
+
+  function pagoEm(D, chave) {
+    if (D.local.despagos[chave]) return null;
+    return D.local.pagos[chave] || D.pagosRemotos[chave] || null;
+  }
+
+  // Vendas (ML + Shopee) de um mes, para estimar o DAS
+  function faturamentoDoMes(m) {
+    return (state.transacoes || []).reduce(function (s, t) {
+      return s + (t.tipo === 'venda' && String(t.data || '').slice(0, 7) === m ? (Number(t.valor) || 0) : 0);
+    }, 0);
+  }
+
+  // Tudo que vence num mes. Compras no cartao viram uma linha so: a fatura daquele cartao.
+  function contasDoMes(m, D) {
+    D = D || dadosContas();
+    var cartoes = {};
+    D.cartoes.forEach(function (k) { cartoes[k.nome] = { cartao: k, itens: [] }; });
+    var linhas = [];
+    D.contas.forEach(function (c) {
+      var item = null;
+      if (c.tipo === 'parcela') {
+        var n = difMeses(c.primeira || c.inicio || m, m) + 1;
+        if (n >= 1 && n <= (Number(c.parcelas) || 1)) item = { conta: c, parcela: n, de: Number(c.parcelas) || 1 };
+      } else if ((!c.inicio || c.inicio <= m) && (!c.fim || m <= c.fim)) {
+        item = { conta: c };
+      }
+      if (!item) return;
+      item.valor = Number(c.valor) || 0;
+      if (c.forma && cartoes[c.forma]) { cartoes[c.forma].itens.push(item); return; }
+      var chave = c.id + ':' + m;
+      linhas.push({ chave: chave, nome: c.nome, valor: item.valor, vence: diaNoMes(m, c.dia), quem: c.de || 'empresa',
+        categoria: c.categoria || (c.tipo === 'parcela' ? 'Parcelamento' : 'Conta fixa'), forma: c.forma || '',
+        parcela: item.parcela ? item.parcela + '/' + item.de : null, aproximado: !!c.aproximado, obs: c.obs || '',
+        id: c.id, origem: c, pago: pagoEm(D, chave) });
+    });
+    Object.keys(cartoes).forEach(function (nome) {
+      var k = cartoes[nome];
+      if (!k.itens.length) return;
+      var chave = 'cartao-' + (k.cartao.id || nome) + ':' + m;
+      linhas.push({ chave: chave, nome: 'Fatura ' + nome, valor: k.itens.reduce(function (s, i) { return s + i.valor; }, 0),
+        vence: diaNoMes(m, k.cartao.vencimento), quem: k.cartao.de || 'cpf', categoria: 'Cartão de crédito', forma: nome,
+        itens: k.itens, cartao: true, pago: pagoEm(D, chave) });
+    });
+    var imp = Number(state.configLucro && state.configLucro.imposto) || 0;
+    var fatAnt = faturamentoDoMes(somaMes(m, -1));
+    if (imp > 0 && fatAnt > 0) {
+      var chaveDas = 'das:' + m;
+      linhas.push({ chave: chaveDas, nome: 'Imposto Simples (DAS)', valor: fatAnt * imp / 100, vence: diaNoMes(m, 20), quem: 'empresa',
+        categoria: 'Imposto', forma: 'Guia DAS', aproximado: true, das: true,
+        obs: 'Estimado: ' + fmtPct(imp / 100) + ' sobre ' + fmtMoney(fatAnt) + ' vendidos em ' + somaMes(m, -1).split('-').reverse().join('/') + '. O valor certo é o da guia.',
+        pago: pagoEm(D, chaveDas) });
+    }
+    linhas.sort(function (a, b) { return a.vence < b.vence ? -1 : a.vence > b.vence ? 1 : b.valor - a.valor; });
+    return linhas;
+  }
+
+  function resumoContasMes(m, D) {
+    var hoje = isoHoje(0);
+    var linhas = contasDoMes(m, D);
+    var r = { linhas: linhas, total: 0, pago: 0, falta: 0, atrasado: 0, empresa: 0, cpf: 0, proximas: [] };
+    linhas.forEach(function (l) {
+      r.total += l.valor;
+      if (l.quem === 'cpf') r.cpf += l.valor; else r.empresa += l.valor;
+      if (l.pago) r.pago += l.valor;
+      else { r.falta += l.valor; if (l.vence < hoje) r.atrasado += l.valor; }
+    });
+    return r;
+  }
+
+  // Parcelamentos em andamento a partir de um mes: quanto falta e quando acaba
+  function parcelasEmAndamento(m, D) {
+    D = D || dadosContas();
+    return D.contas.filter(function (c) { return c.tipo === 'parcela'; }).map(function (c) {
+      var total = Number(c.parcelas) || 1, n = difMeses(c.primeira || m, m) + 1;
+      var restantes = Math.max(0, total - Math.max(n, 1) + 1);
+      if (n < 1) restantes = total;
+      return { conta: c, atual: Math.min(Math.max(n, 0), total), total: total, restantes: n > total ? 0 : restantes,
+        falta: (n > total ? 0 : restantes) * (Number(c.valor) || 0), acaba: somaMes(c.primeira || m, total - 1) };
+    }).filter(function (p) { return p.restantes > 0; }).sort(function (a, b) { return a.acaba < b.acaba ? -1 : 1; });
+  }
+  // ===================== CONTAS A PAGAR: TELA =====================
+
+  function nomeMesLongo(m) {
+    var s = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function renderContasTab(wrap) {
+    var D = dadosContas();
+    function salvar() { gravarLocal('ml-contas-local', D.local); render(); }
+    var hoje = isoHoje(0), mesHoje = hoje.slice(0, 7);
+    var meses = [];
+    for (var i = -3; i <= 12; i++) meses.push(somaMes(mesHoje, i));
+    var mes = meses.indexOf(state.contasMes) !== -1 ? state.contasMes : mesHoje;
+    var r = resumoContasMes(mes, D);
+
+    var sel = el('select', { onchange: function () { state.contasMes = sel.value; render(); } }, meses.map(function (m) {
+      var o = el('option', { value: m, text: nomeMesLongo(m) + (m === mesHoje ? ' (este mês)' : '') }); if (m === mes) o.setAttribute('selected', ''); return o;
+    }));
+    wrap.appendChild(el('div', { class: 'rel-topo' }, [el('div', {}, [
+      el('h2', { text: 'Contas a pagar' }),
+      el('p', { class: 'pml-margin', text: 'Contas fixas, parcelas, faturas do cartão e imposto, da loja e do CPF. Me mande pelo chat ou lance aqui.' })
+    ]), el('div', { class: 'rel-acoes' }, [sel])]));
+
+    wrap.appendChild(el('div', { class: 'pml-metrics' }, [
+      metricaFicha('Total do mês', fmtMoney(r.total), r.linhas.length + (r.linhas.length === 1 ? ' conta' : ' contas'), ''),
+      metricaFicha('Já pago', fmtMoney(r.pago), r.total ? fmtPct(r.pago / r.total) + ' do mês' : '—', 'pos'),
+      metricaFicha('Falta pagar', fmtMoney(r.falta), r.atrasado ? fmtMoney(r.atrasado) + ' atrasado' : 'nada atrasado', r.atrasado ? 'neg' : ''),
+      metricaFicha('Loja / CPF', fmtMoney(r.empresa) + ' / ' + fmtMoney(r.cpf), 'separado por quem paga', '')
+    ]));
+
+    // Lista do mes
+    var lc = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Vencimentos de ' + nomeMesLongo(mes) })]);
+    if (!r.linhas.length) lc.appendChild(el('div', { class: 'pml-empty', text: D.contas.length ? 'Nada vence neste mês.' : 'Nenhuma conta cadastrada ainda. Me mande pelo chat (ex.: "aluguel 800 todo dia 10, CPF") ou use o formulário abaixo.' }));
+    r.linhas.forEach(function (l) {
+      var dias = Math.round((new Date(l.vence + 'T12:00:00') - new Date(hoje + 'T12:00:00')) / 86400000);
+      var status = l.pago ? 'pago em ' + l.pago.split('-').reverse().join('/') : dias < 0 ? '<b style="color:var(--bad)">atrasada há ' + (-dias) + (dias === -1 ? ' dia' : ' dias') + '</b>' : dias === 0 ? '<b style="color:var(--warn)">vence hoje</b>' : dias <= 3 ? '<b style="color:var(--warn)">vence em ' + dias + (dias === 1 ? ' dia' : ' dias') + '</b>' : 'vence ' + l.vence.slice(8, 10) + '/' + l.vence.slice(5, 7);
+      var info = [l.quem === 'cpf' ? 'CPF' : 'Loja', l.categoria, l.parcela ? 'parcela ' + l.parcela : null, l.forma && !l.cartao ? l.forma : null, status].filter(Boolean).join(' · ');
+      var linha = el('div', { class: 'tarefa' + (l.pago ? ' feita' : '') }, [
+        el('button', { class: 'tarefa-check', title: l.pago ? 'Desmarcar' : 'Marcar como paga', text: l.pago ? '✓' : '', onclick: function () {
+          if (l.pago) { delete D.local.pagos[l.chave]; D.local.despagos[l.chave] = true; }
+          else { D.local.pagos[l.chave] = hoje; delete D.local.despagos[l.chave]; }
+          salvar();
+        } }),
+        el('div', { class: 'tarefa-texto' }, [
+          el('div', { class: 'tarefa-titulo', text: l.nome }),
+          el('div', { class: 'pml-margin', html: info }),
+          l.obs ? el('div', { class: 'pml-margin', text: l.obs }) : null
+        ].filter(Boolean)),
+        el('b', { style: 'white-space:nowrap;', text: (l.aproximado ? '≈ ' : '') + fmtMoney(l.valor) }),
+        (!l.cartao && !l.das) ? el('button', { class: 'tarefa-x', title: 'Excluir esta conta (todos os meses)', text: '×', onclick: function () {
+          if (String(l.id).charAt(0) === 'l') D.local.novas = D.local.novas.filter(function (x) { return x.id !== l.id; }); else D.local.excluidas[l.id] = true;
+          salvar();
+        } }) : null
+      ].filter(Boolean));
+      lc.appendChild(linha);
+      if (l.cartao) {
+        var det = el('details', { style: 'margin:-4px 0 8px 40px;' }, [el('summary', { class: 'pml-margin', text: 'O que tem nesta fatura (' + l.itens.length + ')' })]);
+        l.itens.forEach(function (it) {
+          det.appendChild(el('div', { class: 'pml-margin', style: 'display:flex; justify-content:space-between; gap:8px; padding:3px 0;' }, [
+            el('span', { text: it.conta.nome + (it.parcela ? ' · ' + it.parcela + '/' + it.de : '') + (it.conta.de === 'empresa' ? ' · loja' : '') }),
+            el('span', { text: fmtMoney(it.valor) })
+          ]));
+        });
+        lc.appendChild(det);
+      }
+    });
+    wrap.appendChild(lc);
+
+    // Proximos meses
+    var prox = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Quanto já está comprometido nos próximos meses' })]);
+    var tb = el('tbody');
+    for (var k = 0; k < 6; k++) {
+      var m = somaMes(mesHoje, k), rm = resumoContasMes(m, D);
+      tb.appendChild(el('tr', {}, [el('td', { text: nomeMesLongo(m) }), el('td', { class: 'num', text: fmtMoney(rm.empresa) }), el('td', { class: 'num', text: fmtMoney(rm.cpf) }), el('td', { class: 'num', style: 'font-weight:700;', text: fmtMoney(rm.total) })]));
+    }
+    prox.appendChild(el('div', { class: 'pml-table-wrap' }, [el('table', { class: 'pml-table' }, [
+      el('thead', {}, [el('tr', {}, ['Mês', 'Loja', 'CPF', 'Total'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); }))]), tb
+    ])]));
+    prox.appendChild(el('p', { class: 'pml-note', text: 'O imposto dos meses futuros só aparece quando o mês anterior tiver vendas. Contas com ≈ são estimadas.' }));
+    wrap.appendChild(prox);
+
+    // Parcelamentos
+    var pa = parcelasEmAndamento(mesHoje, D);
+    if (pa.length) {
+      var pc = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Parcelamentos em andamento' })]);
+      pc.appendChild(el('div', { class: 'pml-table-wrap' }, [el('table', { class: 'pml-table' }, [
+        el('thead', {}, [el('tr', {}, ['O quê', 'Parcela', 'Valor', 'Ainda falta', 'Última'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); }))]),
+        el('tbody', {}, pa.map(function (p) {
+          return el('tr', {}, [el('td', { text: p.conta.nome + (p.conta.forma ? ' · ' + p.conta.forma : '') }), el('td', { text: (p.atual || 0) + '/' + p.total }),
+            el('td', { class: 'num', text: fmtMoney(Number(p.conta.valor) || 0) }), el('td', { class: 'num', style: 'font-weight:700;', text: fmtMoney(p.falta) }),
+            el('td', { class: 'num', text: nomeMesCurto(p.acaba) })]);
+        }))
+      ])]));
+      pc.appendChild(el('p', { class: 'pml-margin', text: 'Total que ainda falta pagar em parcelas: ' + fmtMoney(pa.reduce(function (s, p) { return s + p.falta; }, 0)) }));
+      wrap.appendChild(pc);
+    }
+
+    // Formulario
+    var f = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Lançar conta' })]);
+    var tipo = el('select', {}, [el('option', { value: 'fixa', text: 'Fixa (todo mês)' }), el('option', { value: 'parcela', text: 'Parcelada' })]);
+    var nome = el('input', { placeholder: 'Ex.: Aluguel, internet, impressora 4' });
+    var valor = el('input', { type: 'number', step: '0.01', placeholder: 'Valor (da parcela, se for parcelado)' });
+    var dia = el('input', { type: 'number', min: '1', max: '31', placeholder: 'Dia que vence' });
+    var quem = el('select', {}, [el('option', { value: 'empresa', text: 'Loja (CNPJ)' }), el('option', { value: 'cpf', text: 'CPF' })]);
+    var forma = el('select', {}, ['Pix', 'Boleto', 'Débito automático'].concat(D.cartoes.map(function (c) { return c.nome; })).map(function (x) { return el('option', { value: x, text: D.cartoes.some(function (c) { return c.nome === x; }) ? 'Cartão ' + x : x }); }));
+    var nParc = el('input', { type: 'number', min: '1', placeholder: 'Nº de parcelas' });
+    var primeira = el('input', { type: 'month', value: mesHoje });
+    function campoC(r, x) { return el('div', { class: 'pml-field' }, [el('label', { text: r }), x]); }
+    f.appendChild(el('div', { class: 'pml-form-grid' }, [campoC('Tipo', tipo), campoC('O quê', nome), campoC('Valor (R$)', valor), campoC('Vence dia', dia),
+      campoC('Quem paga', quem), campoC('Como paga', forma), campoC('Parcelas (se parcelado)', nParc), campoC('Começa em', primeira)]));
+    f.appendChild(el('button', { class: 'pml-btn', text: 'Lançar', onclick: function () {
+      if (!nome.value.trim() || !(num(valor.value) > 0)) return;
+      var nova = { id: 'l' + uid(), tipo: tipo.value, nome: nome.value.trim(), valor: num(valor.value), dia: num(dia.value) || 1, de: quem.value, forma: forma.value };
+      if (tipo.value === 'parcela') { nova.parcelas = Math.max(1, num(nParc.value) || 1); nova.primeira = primeira.value || mesHoje; } else nova.inicio = primeira.value || mesHoje;
+      D.local.novas.push(nova);
+      salvar();
+    } }));
+    f.appendChild(el('p', { class: 'pml-note', text: 'Compra no cartão entra na fatura daquele cartão (os cartões eu cadastro quando você me passar o dia de vencimento). O que você marca como pago fica salvo neste navegador.' }));
+    wrap.appendChild(f);
+  }
   function render() {
     destruirGraficos();
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'cpf' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
     renderHeader(wrap);
     renderTabs(wrap);
     if (!state.loaded) {
@@ -3967,6 +4202,8 @@
       renderCalc3dTab(wrap);
     } else if (state.tab === 'tarefas') {
       renderTarefasTab(wrap);
+    } else if (state.tab === 'contas') {
+      renderContasTab(wrap);
     } else if (state.tab === 'cpf') {
       renderCpfTab(wrap);
     } else if (state.tab === 'relatorio') {
@@ -3982,7 +4219,7 @@
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
   var abaDoLink = (location.hash || '').replace('#', '');
-  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'tarefas', 'cpf', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
+  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'tarefas', 'contas', 'cpf', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   mostrarIntro();
   loadData();

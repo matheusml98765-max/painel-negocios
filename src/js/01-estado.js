@@ -14,7 +14,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana' };
 
   function fmtMoney(n) {
     var v = Number(n);

@@ -62,7 +62,7 @@
     return rot + ' (' + f(seg) + ' a ' + f(fim.toISOString().slice(0, 10)) + ')';
   }
 
-  function nomeMes(m) {
+  function nomeMesCurto(m) {
     var n = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     return n[Number(m.slice(5, 7)) - 1] + '/' + m.slice(0, 4);
   }
@@ -89,7 +89,7 @@
     // Ultima semana (ou mes) com compras: cada compra e a comparacao dela
     var atual = grupos[0], anterior = grupos[1];
     var saldoAtual = atual.aMais - atual.aMenos;
-    var frase = (visao === 'semana' ? nomeSemana(atual.mes) : nomeMes(atual.mes)) + ': ' + atual.compras + (atual.compras === 1 ? ' compra, ' : ' compras, ') + fmtMoney(atual.gasto) + '. ' +
+    var frase = (visao === 'semana' ? nomeSemana(atual.mes) : nomeMesCurto(atual.mes)) + ': ' + atual.compras + (atual.compras === 1 ? ' compra, ' : ' compras, ') + fmtMoney(atual.gasto) + '. ' +
       (atual.aMais || atual.aMenos ? (saldoAtual > 0.005 ? 'Pagou ' + fmtMoney(saldoAtual) + ' a mais que antes.' : saldoAtual < -0.005 ? 'Saiu ' + fmtMoney(-saldoAtual) + ' mais barato que antes.' : 'Mesmo preço de antes.') : 'Sem compra anterior para comparar.');
     if (anterior) {
       var saldoAnt = anterior.aMais - anterior.aMenos;
@@ -104,7 +104,7 @@
       el('tbody', {}, grupos.map(function (m) {
         var saldo = m.aMais - m.aMenos;
         return el('tr', {}, [
-          el('td', { text: visao === 'semana' ? nomeSemana(m.mes) : nomeMes(m.mes) }), el('td', { text: String(m.compras) }),
+          el('td', { text: visao === 'semana' ? nomeSemana(m.mes) : nomeMesCurto(m.mes) }), el('td', { text: String(m.compras) }),
           el('td', { class: 'num', text: fmtMoney(m.gasto) }),
           el('td', { class: 'num', style: m.aMais ? 'color:var(--bad);' : '', text: m.aMais ? fmtMoney(m.aMais) : '—' }),
           el('td', { class: 'num', style: m.aMenos ? 'color:var(--good);' : '', text: m.aMenos ? fmtMoney(m.aMenos) : '—' }),

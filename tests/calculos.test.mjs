@@ -211,3 +211,31 @@ test('compras: cada compra comparada com o preço de antes, por semana e por mê
   perto(sem.aMenos, 50, 'economia da semana'); perto(sem.aMais, 5, 'a mais na semana');
   assert.equal(r.meses[0].compras, 4);
 });
+
+test('contas: fixas, parcelas, fatura do cartão e imposto estimado', () => {
+  const p = painelBase();
+  p.state.configLucro.imposto = 4;
+  p.state.transacoes = [{ tipo: 'venda', data: '2026-09-15', valor: 1000, itens: [] }];
+  p.state.contasRemotas = {
+    cartoes: [{ id: 'k01', nome: 'Nubank', vencimento: 10, de: 'cpf' }],
+    contas: [
+      { id: 'f001', tipo: 'fixa', nome: 'Internet', valor: 100, dia: 5, de: 'cpf', forma: 'Pix', inicio: '2026-01' },
+      { id: 'f002', tipo: 'fixa', nome: 'Streaming', valor: 40, dia: 1, de: 'cpf', forma: 'Nubank' },
+      { id: 'p001', tipo: 'parcela', nome: 'Impressora', valor: 300, parcelas: 10, primeira: '2026-08', dia: 10, de: 'empresa', forma: 'Nubank' },
+      { id: 'f003', tipo: 'fixa', nome: 'Antiga', valor: 50, dia: 5, fim: '2026-09' },
+    ],
+    pagos: { 'f001:2026-10': '2026-10-04' },
+  };
+  const ls = p.contasDoMes('2026-10');
+  const fat = ls.find((l) => l.cartao);
+  perto(fat.valor, 340, 'fatura Nubank');
+  assert.equal(fat.itens.find((i) => i.conta.id === 'p001').parcela, 3);
+  assert.equal(ls.some((l) => l.id === 'f003'), false);
+  perto(ls.find((l) => l.das).valor, 40, 'DAS de outubro sobre setembro');
+  assert.equal(ls.find((l) => l.das).vence, '2026-10-20');
+  const r = p.resumoContasMes('2026-10');
+  perto(r.total, 480, 'total'); perto(r.pago, 100, 'pago');
+  const pa = p.parcelasEmAndamento('2026-10');
+  assert.equal(pa[0].restantes, 8); perto(pa[0].falta, 2400, 'falta impressora'); assert.equal(pa[0].acaba, '2027-05');
+  assert.equal(p.contasDoMes('2027-06').some((l) => l.id === 'p001' || (l.itens || []).some((i) => i.conta.id === 'p001')), false);
+});
