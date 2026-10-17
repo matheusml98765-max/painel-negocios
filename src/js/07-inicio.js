@@ -34,6 +34,7 @@
       ])
     ]);
     wrap.appendChild(sau);
+    renderAvisos(wrap);
 
     var grid = el('div', { class: 'ini-grid' });
 

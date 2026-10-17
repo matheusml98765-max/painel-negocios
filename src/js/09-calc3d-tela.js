@@ -193,5 +193,6 @@
       wrap.appendChild(sim);
     }
     renderLuzInsumosCards(wrap);
+    renderFalhasCard(wrap);
     renderComprasCard(wrap);
   }

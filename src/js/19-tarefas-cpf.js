@@ -12,7 +12,7 @@
 
   async function sincronizarTarefasCpf() {
     if (!state.gistUrl) return;
-    var pares = [['tarefas.json', 'tarefasRemotas', 'ml-tarefas-remotas'], ['financas_cpf.json', 'cpfRemoto', 'ml-cpf-remoto'], ['contas.json', 'contasRemotas', 'ml-contas-remotas']];
+    var pares = [['tarefas.json', 'tarefasRemotas', 'ml-tarefas-remotas'], ['financas_cpf.json', 'cpfRemoto', 'ml-cpf-remoto'], ['contas.json', 'contasRemotas', 'ml-contas-remotas'], ['producao.json', 'producaoRemota', 'ml-producao-remota']];
     for (var i = 0; i < pares.length; i++) {
       try {
         var r = await fetch(urlArquivoIrmao(state.gistUrl, pares[i][0]) + '?_=' + Date.now());

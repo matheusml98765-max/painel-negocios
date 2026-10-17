@@ -43,6 +43,10 @@
         if (g > 0) uso[t.data] = (uso[t.data] || 0) + g;
       });
     });
+    if (chave.indexOf('fil:') === 0 && typeof gramasFalhasPorDia === 'function') {
+      var gf = gramasFalhasPorDia(chave.slice(4));
+      Object.keys(gf).forEach(function (d) { uso[d] = (uso[d] || 0) + gf[d]; });
+    }
     return uso;
   }
 
@@ -90,7 +94,7 @@
 
   function filaFifo(chave) {
     var c = getCalc3d();
-    var k = (state.transacoes || []).length + '|' + JSON.stringify([c.filamentos, c.embalagens, c.produtos, c.estoqueInsumos, c.perdaPct]).length;
+    var k = (state.transacoes || []).length + '|' + JSON.stringify([c.filamentos, c.embalagens, c.produtos, c.estoqueInsumos, c.perdaPct, typeof dadosProducao === 'function' ? dadosProducao().falhas : 0]).length;
     if (memoFifo.chave !== k) memoFifo = { chave: k, filas: {} };
     if (!(chave in memoFifo.filas)) memoFifo.filas[chave] = montarFila(chave);
     return memoFifo.filas[chave];

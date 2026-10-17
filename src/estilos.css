@@ -302,3 +302,11 @@
     .pml-tabs, .pml-header-acoes, .rel-acoes, #intro, .pml-import-summary { display: none !important; }
     .pml-card, .pml-metric { box-shadow: none !important; break-inside: avoid; }
   }
+
+  .avisos .aviso { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .avisos .aviso:first-of-type { border-top: 0; }
+  .avisos .aviso.forte .aviso-texto { font-weight: 700; }
+  .aviso-icone { width: 24px; text-align: center; font-size: 18px; }
+  .aviso-texto { flex: 1 1 260px; }
+  .aviso-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .aviso-acoes .pml-btn { padding: 5px 10px; font-size: 12px; }

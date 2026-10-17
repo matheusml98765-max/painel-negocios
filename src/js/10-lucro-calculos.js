@@ -126,6 +126,7 @@
       g.maxCompra = g.unidades ? (g.liquido - g.imposto) / g.unidades - alvo * g.precoMedio : null;
       return g;
     });
+    if (typeof aplicarFalhasNoLucro === 'function') aplicarFalhasNoLucro(linhas, limiteStr, ateStr);
     return { linhas: linhas, semDados: semDados };
   }
 

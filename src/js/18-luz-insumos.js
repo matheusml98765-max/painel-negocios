@@ -32,6 +32,10 @@
         (p.insumos || []).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
       });
     });
+    if (typeof falhasNoPeriodo === 'function') {
+      var fx = falhasNoPeriodo(de, ate);
+      r.falhas = fx; r.horas += fx.horas; r.kwh += fx.kwh; r.gramas += fx.gramas;
+    }
     r.luz = r.kwh * num(c.kwh);
     r.lista = Object.keys(r.pecas).map(function (k) { return r.pecas[k]; }).sort(function (a, b) { return b.horas - a.horas; });
     return r;
@@ -82,7 +86,7 @@
     var iv = intervaloMes(escolha);
     var r = calcConsumo3d(iv.de, iv.ate);
     var card = el('div', { class: 'pml-card' });
-    card.appendChild(el('p', { class: 'pml-section-title', text: 'Luz das impressoras (calculada pelas vendas)' }));
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Luz das impressoras (peças vendidas + falhas lançadas)' }));
     var sel = el('select', { onchange: function () { state.mesLuz = sel.value; render(); } }, [mesAtual, mesAnt].map(function (m) {
       var p = m.split('-'); var nome = new Date(Number(p[0]), Number(p[1]) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       var o = el('option', { value: m, text: nome.charAt(0).toUpperCase() + nome.slice(1) + (m === mesAtual ? ' (até hoje)' : '') });
@@ -93,7 +97,7 @@
       card.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma peça 3D vendida neste mês com gramas, horas e código do anúncio preenchidos.' }));
     } else {
       card.appendChild(el('div', { class: 'pml-metrics', style: 'margin-bottom:12px;' }, [
-        metricaFicha('Horas de impressão', Math.round(r.horas).toLocaleString('pt-BR') + ' h', r.unidades + ' peças vendidas + ' + num(c.perdaPct) + '% de perdas'),
+        metricaFicha('Horas de impressão', Math.round(r.horas).toLocaleString('pt-BR') + ' h', r.unidades + ' peças vendidas' + (r.falhas && r.falhas.horas ? ' + ' + r.falhas.horas.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h de falhas' : '') + (num(c.perdaPct) ? ' + ' + num(c.perdaPct) + '% de perdas' : '')),
         metricaFicha('Energia', r.kwh.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' kWh', 'a ' + fmtMoney(num(c.kwh)) + ' por kWh'),
         metricaFicha('Sua parte na conta de luz', fmtMoney(r.luz), 'só o que as impressoras gastaram', 'neg'),
         metricaFicha('Filamento usado', (r.gramas / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' kg', 'pelas peças vendidas')

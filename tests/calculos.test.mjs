@@ -280,3 +280,17 @@ test('vendas do dia: taxas, imposto, custo e lucro de cada venda', () => {
   assert.equal(r.semTaxas, 1); assert.equal(r.semCusto, 1);
   perto(r.bruto, 80, 'vendido');
 });
+
+test('falha de impressão: gramas × % onde parou, entra no lucro e no estoque de filamento', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  Object.assign(c, { kwh: 1, perdaPct: 0, manutencaoHora: 0, impressoras: [{ id: 'i', nome: 'A1', watts: 100, preco: 0, vidaHoras: 0 }],
+    filamentos: [{ tipo: 'PETG', data: '2026-10-01', kg: 1, preco: 60, frete: 0 }] });
+  c.produtos = [{ id: 'dreno', nome: 'Dreno', tipo: 'PETG', gramas: 66.31, horas: 3.18, porPlaca: 1, impressoraId: 'i', anuncios: '111', insumos: [] }];
+  p.state.producaoRemota = { falhas: [{ id: 'x1', data: '2026-10-17', pecaId: 'dreno', qtd: 4, pct: 10 }] };
+  const f = p.custoFalha(p.state.producaoRemota.falhas[0]);
+  perto(f.gramas, 26.524, 'gramas perdidos');
+  perto(f.total, 26.524 * 0.06 + 4 * 3.18 * 0.1 * 0.1, 'perda em R$');
+  const r = p.falhasNoPeriodo('2026-10-01', '2026-10-31');
+  perto(r.total, f.total, 'mês');
+});
