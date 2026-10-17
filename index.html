@@ -4911,13 +4911,14 @@
       ]));
     }
 
-    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Suas conquistas' })]);
+    var investido = itens.reduce(function (s, c) { return s + (Number(c.valor) || 0); }, 0);
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Suas conquistas' + (investido ? ' · ' + fmtMoney(investido) + (itens.some(function (c) { return c.mais; }) ? ' ou mais' : '') + ' conquistados' : '') })]);
     if (!itens.length) card.appendChild(el('div', { class: 'pml-empty', text: 'Me conte suas conquistas pelo chat que eu coloco aqui.' }));
     itens.forEach(function (c) {
       card.appendChild(el('div', { class: 'conq-item' }, [
         el('span', { class: 'conq-icone', text: c.icone || '🏆' }),
         el('div', {}, [
-          el('div', { class: 'tarefa-titulo', text: c.titulo }),
+          el('div', { class: 'tarefa-titulo', text: c.titulo + (c.valor ? ' · ' + fmtMoney(Number(c.valor)) + (c.mais ? '+' : '') : '') }),
           el('div', { class: 'pml-margin', text: [c.data ? (c.data.length === 7 ? nomeMesCurto(c.data) : c.data.split('-').reverse().join('/')) : null, c.descricao].filter(Boolean).join(' · ') })
         ])
       ]));
