@@ -4286,7 +4286,7 @@
     var precoDia = {}, faltou = 0, ultimo = lotes[lotes.length - 1].unit;
     dias.forEach(function (d) {
       depois.forEach(function (l) { if (l.data === d) fila.push({ data: l.data, qtd: l.qtd, unit: l.unit }); });
-      var precisa = uso[d] || 0, pago = 0, gasto = 0;
+      var precisa = d > cont.data ? (uso[d] || 0) : 0, pago = 0, gasto = 0;
       while (precisa > 1e-9 && fila.length) {
         var f = fila[0], q = Math.min(f.qtd, precisa);
         pago += q * f.unit; gasto += q; f.qtd -= q; precisa -= q;
