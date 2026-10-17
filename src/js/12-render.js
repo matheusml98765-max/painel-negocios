@@ -32,6 +32,8 @@
       renderTarefasTab(wrap);
     } else if (state.tab === 'contas') {
       renderContasTab(wrap);
+    } else if (state.tab === 'receber') {
+      renderReceberTab(wrap);
     } else if (state.tab === 'cpf') {
       renderCpfTab(wrap);
     } else if (state.tab === 'relatorio') {
@@ -48,7 +50,7 @@
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
   var abaDoLink = (location.hash || '').replace('#', '');
-  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'tarefas', 'contas', 'cpf', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
+  if (['geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'tarefas', 'contas', 'receber', 'cpf', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   mostrarIntro();
   loadData();

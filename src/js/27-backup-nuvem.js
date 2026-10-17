@@ -4,7 +4,7 @@
   // mesmo Gist secreto da automacao (backup_painel.json) sempre que algo muda, e a automacao
   // guarda o historico dessa copia no repositorio privado. Tokens nunca entram na copia.
 
-  var CHAVES_NUVEM = CHAVES_BACKUP.concat(['ml-tarefas-local', 'ml-cpf-local', 'ml-contas-local', 'ml-producao-local']);
+  var CHAVES_NUVEM = CHAVES_BACKUP.concat(['ml-tarefas-local', 'ml-cpf-local', 'ml-contas-local', 'ml-producao-local', 'ml-receber-local']);
   var ARQ_BACKUP = 'backup_painel.json';
 
   function idDoGist(url) {
