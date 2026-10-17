@@ -1933,12 +1933,22 @@
 
   function num(v) { var n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; }
 
-  // Custo por grama de um tipo de filamento: media ponderada de todos os lotes daquele tipo
-  // (soma do que voce pagou, com frete) / (soma dos gramas que chegaram).
+  // Preco atual, nao o historico: o vendedor vai barateando as compras, entao vale o que ele
+  // paga hoje. Usa as compras feitas ate 30 dias antes da compra mais recente (com frete).
+  // Lotes sem data entram todos (cadastro antigo).
+  function lotesAtuais(lotes) {
+    var datas = lotes.map(function (l) { return l.data || ''; }).filter(Boolean).sort();
+    if (!datas.length) return lotes;
+    var ultima = new Date(datas[datas.length - 1] + 'T12:00:00');
+    var corte = new Date(ultima.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    return lotes.filter(function (l) { return l.data && l.data >= corte; });
+  }
+
   function custoGrama(tipo) {
     var c = getCalc3d();
     var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
     if (!lotes.length) lotes = c.filamentos;
+    lotes = lotesAtuais(lotes);
     var gramas = lotes.reduce(function (s, l) { return s + num(l.kg) * 1000; }, 0);
     var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
     return gramas > 0 ? pago / gramas : 0;
@@ -1946,7 +1956,7 @@
 
   function custoEmbalagem(nome) {
     var c = getCalc3d();
-    var lotes = c.embalagens.filter(function (l) { return l.nome === nome; });
+    var lotes = lotesAtuais(c.embalagens.filter(function (l) { return l.nome === nome; }));
     var qtd = lotes.reduce(function (s, l) { return s + num(l.qtd); }, 0);
     var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
     return qtd > 0 ? pago / qtd : 0;
@@ -2059,7 +2069,7 @@
     }
 
     var resumoFil = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;' }, tiposFilamento().map(function (t) {
-      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ': ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
+      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ' (preço atual, compras dos últimos 30 dias): ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
     }));
     wrap.appendChild(cardLotes('2. Remessas de filamento', c.filamentos, [
       { titulo: 'Data', chave: 'data', largura: 130 },

@@ -29,6 +29,23 @@ test('custo por grama é a média ponderada de todas as remessas (com frete)', (
   perto(p.custoGrama('PLA') * 1000, (89.9 + 15 + 150) / 3, 'R$/kg');
 });
 
+test('custo por grama usa o preço atual: compras dos últimos 30 dias, não o histórico', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.filamentos = [
+    { tipo: 'PETG', data: '2026-07-18', kg: 5, preco: 384.5, frete: 0 },
+    { tipo: 'PETG', data: '2026-10-02', kg: 8, preco: 548, frete: 0 },
+    { tipo: 'PETG', data: '2026-10-02', kg: 9, preco: 603, frete: 0 },
+    { tipo: 'PETG', data: '2026-10-09', kg: 6, preco: 389.94, frete: 0 },
+  ];
+  perto(p.custoGrama('PETG') * 1000, (548 + 603 + 389.94) / 23, 'R$/kg');
+  c.embalagens = [
+    { nome: 'Caixa', data: '2026-05-03', qtd: 50, preco: 60, frete: 0 },
+    { nome: 'Caixa', data: '2026-10-05', qtd: 50, preco: 45, frete: 0 },
+  ];
+  perto(p.custoEmbalagem('Caixa'), 0.9, 'caixa');
+});
+
 test('custo da peça 3D soma filamento, luz, desgaste, manutenção, perdas e insumos', () => {
   const p = painelBase();
   const c = p.getCalc3d();
