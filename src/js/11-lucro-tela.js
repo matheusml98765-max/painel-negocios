@@ -138,6 +138,7 @@
     wrap.appendChild(card);
 
     renderAdsPorProduto(wrap, plat);
+    renderDevolucoesCard(wrap, dias);
     renderFaturaCard(wrap);
   }
 

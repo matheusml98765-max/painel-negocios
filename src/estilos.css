@@ -287,6 +287,9 @@
   .rel-valor { min-width: 104px; font-weight: 700; color: var(--bad); font-variant-numeric: tabular-nums; }
   .rel-plano { margin: 0; padding-left: 22px; line-height: 1.7; color: var(--ink); font-size: 14.5px; }
   @media (max-width: 560px) { .rel-nota { flex-direction: column; align-items: flex-start; } .rel-item { flex-direction: column; gap: 2px; } }
+  .dev-motivo { display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr auto; gap: 12px; align-items: center; padding: 6px 0; font-size: 14px; color: var(--ink); }
+  .dev-motivo .pml-barra { margin: 0; }
+  @media (max-width: 560px) { .dev-motivo { grid-template-columns: 1fr auto; } .dev-motivo .pml-barra { grid-column: 1 / -1; grid-row: 2; } }
   @media print {
     .pml-tabs, .pml-header-acoes, .rel-acoes, #intro, .pml-import-summary { display: none !important; }
     .pml-card, .pml-metric { box-shadow: none !important; break-inside: avoid; }

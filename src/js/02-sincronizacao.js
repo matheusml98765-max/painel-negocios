@@ -36,6 +36,10 @@
       state.anunciosMl = an ? JSON.parse(an.value) : null;
     } catch (e) { state.anunciosMl = null; }
     try {
+      var dv = await window.storage.get('ml-devolucoes');
+      state.devolucoes = dv ? JSON.parse(dv.value) : null;
+    } catch (e) { state.devolucoes = null; }
+    try {
       var ads = await window.storage.get('ml-ads-shopee');
       state.adsShopee = ads ? JSON.parse(ads.value) : null;
     } catch (e) { state.adsShopee = null; }
@@ -115,6 +119,16 @@
       if (dados && Array.isArray(dados.itens)) {
         state.anunciosMl = dados;
         try { await window.storage.set('ml-anuncios', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+    try {
+      var rd = await fetch(urlArquivoIrmao(state.gistUrl, 'devolucoes.json') + '?_=' + Date.now());
+      if (rd.ok) {
+        var dv = await rd.json();
+        if (dv && Array.isArray(dv.itens)) {
+          state.devolucoes = dv;
+          try { await window.storage.set('ml-devolucoes', JSON.stringify(dv)); } catch (e) {}
+        }
       }
     } catch (e) {}
   }

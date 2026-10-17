@@ -126,3 +126,21 @@ test('venda que depois foi cancelada vira cancelamento (não conta duas vezes)',
   assert.equal(p.state.transacoes[0].tipo, 'cancelamento');
   assert.equal(p.state.transacoes[0].custosShopee, undefined);
 });
+
+test('devoluções: conta quebradas, perda em peças e tarifa de devolução do ML no lucro', () => {
+  const p = painel();
+  p.state.custosAvulsos = { '22894922420': 9, MLB1: 50 };
+  p.state.transacoes = [vendaMl(dia(), 1)];
+  p.state.devolucoes = { itens: [
+    { plataforma: 'shopee', tipo: 'devolucao', data: dia() + 'T10:00:00', motivo: 'Chegou quebrado/avariado', quebrado: true, status: 'ACCEPTED', reembolso: 23.9, itens: [{ item_id: '22894922420', titulo: 'Papel', quantidade: 2, preco: 23.9 }] },
+    { plataforma: 'shopee', tipo: 'devolucao', data: dia() + 'T11:00:00', motivo: 'Desistiu da compra', quebrado: false, status: 'PROCESSING', reembolso: 26.9, itens: [{ item_id: '22894922420', quantidade: 1, preco: 26.9 }] },
+    { plataforma: 'ml', tipo: 'custo_devolucao', data: dia() + 'T12:00:00', custo: 9.93, itens: [{ item_id: 'MLB1', quantidade: 1 }] },
+  ], full_ajustes: [] };
+  const r = p.calcDevolucoes(30);
+  assert.equal(r.devolucoes, 2);
+  assert.equal(r.quebradas, 2);
+  perto(r.perdaPecas, 18, 'perda em peças');
+  perto(r.tarifas, 9.93, 'tarifas');
+  const g = p.calcLucroPorProduto(30).linhas.find((x) => x.itemId === 'MLB1');
+  perto(g.lucro, 80 - 50 - 9.93, 'lucro já sem a tarifa de devolução');
+});

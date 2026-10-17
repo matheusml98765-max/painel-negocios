@@ -100,8 +100,10 @@
       });
     });
 
+    var tarifasDev = typeof tarifasDevolucaoPorItem === 'function' ? tarifasDevolucaoPorItem(limiteStr, ateStr) : {};
     var linhas = Object.keys(grupos).map(function (k) {
       var g = grupos[k];
+      g.tarifasDevolucao = tarifasDev[String(g.itemId).toUpperCase()] || 0;
       var custo = custoDoItem(g.itemId);
       g.custoUnit = custo ? custo.valor : null;
       g.fonteCusto = custo ? custo.fonte : null;
@@ -110,7 +112,7 @@
       g.precoMedio = g.unidades ? g.receita / g.unidades : 0;
       if (g.custoUnit !== null) {
         g.custoTotal = g.custoUnit * g.unidades;
-        g.lucro = g.liquido - g.imposto - g.custoTotal;
+        g.lucro = g.liquido - g.imposto - g.custoTotal - g.tarifasDevolucao;
         g.lucroUnit = g.unidades ? g.lucro / g.unidades : 0;
         g.margem = g.receita ? g.lucro / g.receita : null;
         g.roi = g.custoTotal ? g.lucro / g.custoTotal : null;

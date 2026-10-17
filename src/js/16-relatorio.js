@@ -77,6 +77,20 @@
       var antecip = (fat.linhas || []).filter(function (l) { return l.categoria === 'Antecipação'; }).reduce(function (s, l) { return s + l.valor; }, 0);
       if (antecip > 0) itens.push({ valor: antecip, tipo: 'antecipacao', texto: 'Na fatura ' + fat.chave.slice(0, 7) + ' do ML você pagou <b>' + fmtMoney(antecip) + '</b> para receber o dinheiro antes do prazo.', acao: 'Desligue a antecipação automática no Mercado Pago e antecipe só quando precisar.' });
     }
+    // Pecas que chegaram quebradas no mes (devolucoes.json)
+    var quebr = {};
+    ((state.devolucoes && state.devolucoes.itens) || []).forEach(function (x) {
+      var dia = String(x.data || '').slice(0, 10);
+      if (!x.quebrado || x.status === 'CANCELLED' || dia < iv.de || dia > iv.ate) return;
+      (x.itens || []).forEach(function (it) {
+        var q = quebr[it.item_id] || (quebr[it.item_id] = { titulo: it.titulo || it.item_id, un: 0 });
+        q.un += Number(it.quantidade) || 1;
+      });
+    });
+    Object.keys(quebr).forEach(function (id) {
+      var q = quebr[id], c = custoDoItem(id);
+      itens.push({ valor: c ? c.valor * q.un : 0, tipo: 'quebrado', texto: '<b>' + q.un + ' unidade(s) de ' + q.titulo + '</b> chegaram quebradas ao cliente' + (c ? ' (' + fmtMoney(c.valor * q.un) + ' em peças perdidas).' : ' (cadastre o custo para ver a perda).'), acao: 'Reforce a embalagem de ' + curto(q.titulo) + ': ' + q.un + ' chegaram quebradas no mês.' });
+    });
     linhas.filter(function (g) { return g.receita > 0 && g.taxasMl / g.receita > 0.4 && g.lucro !== null && g.lucro >= 0; }).forEach(function (g) {
       itens.push({ valor: 0, tipo: 'taxa', texto: 'A plataforma ficou com <b>' + fmtPct(g.taxasMl / g.receita) + '</b> das vendas de ' + g.titulo + '.', acao: 'Revise o preço ou o tipo de anúncio de ' + curto(g.titulo) + ' (taxa acima de 40%).' });
     });
