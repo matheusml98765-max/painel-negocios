@@ -343,7 +343,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana' };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana', diaVendas: '', atualizandoAgora: null, pedirTokenAtualizar: false, erroToken: '' };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -1747,6 +1747,7 @@
     grid.appendChild(mes);
     var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
     grid.appendChild(blocoMetas(d, lucroMesCalc));
+    renderVendasDoDia(grid);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });
@@ -1960,12 +1961,16 @@
   function custoGrama(tipo, dataRef) {
     var c = getCalc3d();
     var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
+    var peps = precoFifo('fil:' + String(tipo || '').toUpperCase(), dataRef);
+    if (peps !== null) return peps;
     if (!lotes.length) lotes = c.filamentos;
     return precoMedioLotes(lotesDoPeriodo(lotes, dataRef), 'kg', 1000);
   }
 
   function custoEmbalagem(nome, dataRef) {
     var c = getCalc3d();
+    var peps = precoFifo('emb:' + nome, dataRef);
+    if (peps !== null) return peps;
     return precoMedioLotes(lotesDoPeriodo(c.embalagens.filter(function (l) { return l.nome === nome; }), dataRef), 'qtd', 1);
   }
 
@@ -2376,7 +2381,7 @@
     var filtros = el('div', { class: 'pml-filtros' });
     function campo(label, input) { return el('div', { class: 'pml-field' }, [el('label', { text: label }), input]); }
     var selDias = el('select', { onchange: function () { cfg.dias = Number(selDias.value); salvarConfigLucro(); render(); } },
-      [7, 15, 30].map(function (d) { var o = el('option', { value: d, text: 'Últimos ' + d + ' dias' }); if (d === dias) o.setAttribute('selected', ''); return o; }));
+      [1, 7, 15, 30].map(function (d) { var o = el('option', { value: d, text: d === 1 ? 'Hoje' : 'Últimos ' + d + ' dias' }); if (d === dias) o.setAttribute('selected', ''); return o; }));
     var inpImp = el('input', { type: 'number', step: '0.1', value: cfg.imposto, onchange: function () { cfg.imposto = Number(inpImp.value) || 0; salvarConfigLucro(); render(); } });
     var inpAlvo = el('input', { type: 'number', step: '1', value: cfg.margemAlvo, onchange: function () { cfg.margemAlvo = Number(inpAlvo.value) || 0; salvarConfigLucro(); render(); } });
     var selOrdem = el('select', { onchange: function () { cfg.ordem = selOrdem.value; salvarConfigLucro(); render(); } },
@@ -2412,14 +2417,14 @@
     var levou = tot.receita ? 1 - tot.liquido / tot.receita : 0;
 
     var metr = el('div', { class: 'pml-metrics' }, [
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + dias + ' dias)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão, taxas e frete' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: nomePlat + ' ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
     ]);
     if (ads && ads.gasto > 0) {
       metr.appendChild(el('div', { class: 'pml-metric' }, [
-        el('p', { class: 'pml-metric-label', text: 'Shopee Ads (' + dias + ' dias)' }),
+        el('p', { class: 'pml-metric-label', text: 'Shopee Ads (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }),
         el('p', { class: 'pml-metric-value neg', text: fmtMoney(ads.gasto) }),
         el('p', { class: 'pml-margin', text: 'trouxe ' + fmtMoney(ads.vendas) + ' em vendas' + (tot.receitaComCusto ? '. Lucro depois do Ads: ' + fmtMoney(tot.lucro - ads.gasto) : '. Cadastre o custo das peças para ver o lucro depois do Ads.') })
       ]));
@@ -3530,26 +3535,37 @@
 
   function isoHoje(off) { var d = new Date(); d.setDate(d.getDate() + (off || 0)); return isoDia(d); }
 
-  // Estoque de cada insumo: contagem feita pelo vendedor + compras depois dela - uso pelas vendas.
+  // Estoque de cada insumo e de cada filamento: contagem feita pelo vendedor + compras depois
+  // dela - o que as vendas gastaram, pela ordem das compras (23-fifo.js).
   function calcEstoqueInsumos() {
     var c = getCalc3d();
     c.estoqueInsumos = c.estoqueInsumos || {};
+    var itens = [];
+    tiposFilamento().forEach(function (t) { if (c.filamentos.length) itens.push({ nome: nomeFilamentoEstoque(t), chave: 'fil:' + t.toUpperCase(), fator: 1000 }); });
     var nomes = {};
     c.embalagens.forEach(function (l) { if (l.nome) nomes[l.nome] = true; });
-    var uso30 = calcConsumo3d(isoHoje(-29), isoHoje(0)).insumos;
-    return Object.keys(nomes).map(function (nome) {
-      var cont = c.estoqueInsumos[nome];
-      var linha = { nome: nome, contado: !!cont, porDia: (uso30[nome] || 0) / 30 };
+    c.produtos.forEach(function (p) { (p.insumos || []).forEach(function (s) { if (s.nome && num(s.qtd) > 0) nomes[s.nome] = true; }); });
+    Object.keys(nomes).forEach(function (n) { itens.push({ nome: n, chave: 'emb:' + n, fator: 1 }); });
+    var ini = isoHoje(-29);
+    return itens.map(function (it) {
+      var uso = usoPorDia(it.chave);
+      var u30 = Object.keys(uso).reduce(function (s, d) { return s + (d >= ini ? uso[d] : 0); }, 0) / it.fator;
+      var cont = c.estoqueInsumos[it.nome];
+      var linha = { nome: it.nome, contado: !!cont, porDia: u30 / 30, semPreco: !lotesFifo(it.chave).length };
       if (cont) {
-        var comprado = c.embalagens.filter(function (l) { return l.nome === nome && l.data > cont.data; }).reduce(function (s, l) { return s + num(l.qtd); }, 0);
-        var usado = calcConsumo3d(cont.data, isoHoje(0)).insumos[nome] || 0;
+        var f = filaFifo(it.chave);
+        var usado = Object.keys(uso).reduce(function (s, d) { return s + (d >= cont.data ? uso[d] : 0); }, 0) / it.fator;
+        var comprado = lotesFifo(it.chave).filter(function (l) { return l.data > cont.data; }).reduce(function (s, l) { return s + l.qtd; }, 0) / it.fator;
         linha.sobra = num(cont.qtd) + comprado - usado;
         linha.comprado = comprado; linha.usado = usado; linha.desde = cont.data;
-        linha.dias = linha.porDia > 0 ? linha.sobra / linha.porDia : null;
+        linha.dias = linha.porDia > 0 ? Math.max(0, linha.sobra) / linha.porDia : null;
+        if (f && f.fila.length) linha.loteAtual = { data: f.fila[0].data, unit: f.fila[0].unit * it.fator, semCompra: f.fila[0].semCompra };
       }
       return linha;
     }).sort(function (a, b) { return (a.dias === undefined || a.dias === null ? 1e9 : a.dias) - (b.dias === undefined || b.dias === null ? 1e9 : b.dias); });
   }
+
+  function fmtQtd(n) { return (Math.round(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 }); }
 
   function renderLuzInsumosCards(wrap) {
     var c = getCalc3d();
@@ -3598,7 +3614,7 @@
     var t2 = el('table', { class: 'pml-table' });
     t2.appendChild(el('tr', {}, [el('th', { text: 'Insumo' }), el('th', { class: 'num', text: 'Usa por dia' }), el('th', { class: 'num', text: 'Sobra hoje' }), el('th', { class: 'num', text: 'Dura' }), el('th', { text: 'Contei agora' })]));
     lista.forEach(function (l) {
-      var inp = el('input', { type: 'number', step: '1', min: '0', placeholder: 'quantidade', style: 'width:110px;' });
+      var inp = el('input', { type: 'number', step: 'any', min: '0', placeholder: 'quantidade', style: 'width:110px;' });
       var btn = el('button', { class: 'pml-btn', style: 'padding:5px 10px; font-size:12px; margin-left:6px;', text: 'Salvar', onclick: function () {
         if (inp.value === '') return;
         c.estoqueInsumos = c.estoqueInsumos || {};
@@ -3606,15 +3622,16 @@
         salvarCalc3d(); render();
       } });
       t2.appendChild(el('tr', { class: l.dias !== undefined && l.dias !== null && l.dias <= 10 ? 'pml-row-alerta' : '' }, [
-        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + l.comprado + ' comprados · −' + Math.round(l.usado) + ' usados' }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' })]),
+        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + fmtQtd(l.comprado) + ' comprados · −' + fmtQtd(l.usado) + ' usados nas vendas' + (l.loteAtual ? ' · usando agora a compra de ' + (l.loteAtual.semCompra ? 'antes do cadastro' : l.loteAtual.data.split('-').reverse().join('/')) + ' (' + fmtMoney(l.loteAtual.unit) + ' cada)' : '') }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' }), l.semPreco ? el('div', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta cadastrar a compra (preço)' }) : null].filter(Boolean)),
         el('td', { class: 'num', text: l.porDia ? l.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
-        el('td', { class: 'num', style: 'font-weight:700;', text: l.contado ? Math.round(l.sobra).toLocaleString('pt-BR') : '—' }),
+        el('td', { class: 'num', style: 'font-weight:700;', text: l.contado ? fmtQtd(l.sobra) : '—' }),
         el('td', { class: 'num', text: l.dias === undefined ? '—' : (l.dias === null ? 'sem uso' : Math.max(0, Math.round(l.dias)) + ' dias') }),
         el('td', {}, [inp, btn])
       ]));
     });
     ci.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
-    ci.appendChild(el('p', { class: 'pml-note', text: 'Conte uma vez quanto tem de cada insumo e salve. Depois, cada compra cadastrada em "Embalagens e insumos" soma, e cada venda tira a quantidade que a peça usa (campo Insumos de cada peça). Fita em cm.' }));
+    ci.appendChild(el('p', { class: 'pml-note', text: 'Conte uma vez quanto tem de cada insumo e salve. Depois, cada compra cadastrada soma, e cada venda tira o que a peça usa (ex.: papel higiênico com parafuso tira 2 pares de parafuso e bucha e 120 cm de plástico bolha). Fita e plástico bolha em cm; filamento em kg (o que as vendas gastam: peças impressas para estoque e falhas ainda não entram). O custo de cada venda usa a compra que estava sendo gasta naquele dia: a mais antiga primeiro.' }));
+    ci.appendChild(el('p', { class: 'pml-note', text: 'Se a sobra ficar negativa, faltou cadastrar alguma compra.' }));
     wrap.appendChild(ci);
   }
   // ===================== TAREFAS E CPF =====================
@@ -4169,6 +4186,244 @@
     } }));
     f.appendChild(el('p', { class: 'pml-note', text: 'Compra no cartão entra na fatura daquele cartão (os cartões eu cadastro quando você me passar o dia de vencimento). O que você marca como pago fica salvo neste navegador.' }));
     wrap.appendChild(f);
+  }
+  // ===================== CUSTO PELA ORDEM DAS COMPRAS (PEPS) =====================
+  // O que foi comprado primeiro e usado primeiro. Ex.: 20 rolos comprados dia 29 so passam a
+  // valer quando os rolos anteriores acabarem, nao importa o mes. Cada venda gasta o filamento
+  // (gramas do fatiamento + % de perdas) e os insumos da peca (cm de fita, parafusos...).
+  //
+  // Precisa de uma contagem de estoque (Calculadora 3D > Estoque de insumos): o que sobrou na
+  // contagem e o das compras mais recentes. Sem contagem, ou antes dela, vale a regra antiga
+  // (preco das compras mais recentes ate a data), em lotesDoPeriodo.
+
+  var memoFifo = { chave: null, filas: {} };
+
+  function nomeFilamentoEstoque(tipo) { return 'Filamento ' + String(tipo || '').toUpperCase() + ' (kg)'; }
+
+  // Lotes de um item, em unidades basicas: filamento em gramas, insumo na unidade cadastrada
+  function lotesFifo(chave) {
+    var c = getCalc3d();
+    if (chave.indexOf('fil:') === 0) {
+      var tipo = chave.slice(4);
+      return c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === tipo && l.data && num(l.kg) > 0; })
+        .map(function (l) { return { data: l.data, qtd: num(l.kg) * 1000, unit: (num(l.preco) + num(l.frete)) / (num(l.kg) * 1000) }; });
+    }
+    var nome = chave.slice(4);
+    return c.embalagens.filter(function (l) { return l.nome === nome && l.data && num(l.qtd) > 0; })
+      .map(function (l) { return { data: l.data, qtd: num(l.qtd), unit: (num(l.preco) + num(l.frete)) / num(l.qtd) }; });
+  }
+
+  // Quanto deste item cada venda gastou, por dia
+  function usoPorDia(chave) {
+    var c = getCalc3d();
+    var perda = 1 + num(c.perdaPct) / 100;
+    var uso = {};
+    (state.transacoes || []).forEach(function (t) {
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data) return;
+      t.itens.forEach(function (i) {
+        var p = pecaDoItem(i.item_id);
+        if (!p) return;
+        var q = Number(i.quantidade) || 1, g = 0;
+        if (chave.indexOf('fil:') === 0) {
+          if ((p.tipo || '').toUpperCase() === chave.slice(4)) g = num(p.gramas) / Math.max(1, num(p.porPlaca) || 1) * q * perda;
+        } else {
+          (p.insumos || []).forEach(function (s) { if (s.nome === chave.slice(4)) g += num(s.qtd) * q; });
+        }
+        if (g > 0) uso[t.data] = (uso[t.data] || 0) + g;
+      });
+    });
+    return uso;
+  }
+
+  function contagemFifo(chave) {
+    var est = getCalc3d().estoqueInsumos || {};
+    if (chave.indexOf('fil:') === 0) {
+      var e = est[nomeFilamentoEstoque(chave.slice(4))];
+      return e ? { qtd: num(e.qtd) * 1000, data: e.data } : null;
+    }
+    var x = est[chave.slice(4)];
+    return x ? { qtd: num(x.qtd), data: x.data } : null;
+  }
+
+  // Monta a fila de um item: preco usado em cada dia de venda e o que sobra agora, lote a lote
+  function montarFila(chave) {
+    var cont = contagemFifo(chave);
+    var lotes = lotesFifo(chave).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+    if (!cont || !lotes.length) return null;
+    // Na contagem, o que sobrou e das compras mais recentes ate aquele dia
+    var fila = [], falta = cont.qtd;
+    lotes.filter(function (l) { return l.data <= cont.data; }).reverse().forEach(function (l) {
+      if (falta <= 0) return;
+      var q = Math.min(l.qtd, falta); falta -= q;
+      fila.unshift({ data: l.data, qtd: q, unit: l.unit });
+    });
+    if (falta > 0) fila.unshift({ data: cont.data, qtd: falta, unit: (lotes.filter(function (l) { return l.data <= cont.data; })[0] || lotes[0]).unit, semCompra: true });
+    var depois = lotes.filter(function (l) { return l.data > cont.data; });
+    var uso = usoPorDia(chave);
+    var dias = Object.keys(uso).filter(function (d) { return d >= cont.data; }).concat(depois.map(function (l) { return l.data; }));
+    dias = dias.filter(function (d, i) { return dias.indexOf(d) === i; }).sort();
+    var precoDia = {}, faltou = 0, ultimo = lotes[lotes.length - 1].unit;
+    dias.forEach(function (d) {
+      depois.forEach(function (l) { if (l.data === d) fila.push({ data: l.data, qtd: l.qtd, unit: l.unit }); });
+      var precisa = uso[d] || 0, pago = 0, gasto = 0;
+      while (precisa > 1e-9 && fila.length) {
+        var f = fila[0], q = Math.min(f.qtd, precisa);
+        pago += q * f.unit; gasto += q; f.qtd -= q; precisa -= q;
+        if (f.qtd <= 1e-9) fila.shift();
+      }
+      if (precisa > 1e-9) { faltou += precisa; pago += precisa * ultimo; gasto += precisa; }
+      if (gasto > 0) precoDia[d] = pago / gasto;
+    });
+    return { desde: cont.data, precoDia: precoDia, fila: fila, sobra: fila.reduce(function (s, f) { return s + f.qtd; }, 0) - faltou, faltou: faltou, ultimo: ultimo };
+  }
+
+  function filaFifo(chave) {
+    var c = getCalc3d();
+    var k = (state.transacoes || []).length + '|' + JSON.stringify([c.filamentos, c.embalagens, c.produtos, c.estoqueInsumos, c.perdaPct]).length;
+    if (memoFifo.chave !== k) memoFifo = { chave: k, filas: {} };
+    if (!(chave in memoFifo.filas)) memoFifo.filas[chave] = montarFila(chave);
+    return memoFifo.filas[chave];
+  }
+
+  // Preco por unidade basica (g ou unidade) pela ordem das compras; null = usar a regra antiga
+  function precoFifo(chave, dataRef) {
+    var f = filaFifo(chave);
+    var d = dataRef || isoHoje(0);
+    if (!f || d < f.desde) return null;
+    if (f.precoDia[d] !== undefined) return f.precoDia[d];
+    // Dia sem venda (ou hoje): o lote que esta sendo usado agora
+    return f.fila.length ? f.fila[0].unit : f.ultimo;
+  }
+  // ===================== VENDAS DO DIA, UMA POR UMA =====================
+  // Cada venda com o que a plataforma cobrou, o frete, o que cai na conta, o imposto, o custo
+  // do produto (pela ordem das compras) e o lucro. Ads entra no total do dia, nao por venda.
+
+  var REPO_AUTOMACAO = 'matheusml98765-max/automacao-mercado-livre';
+
+  function calcVendasDoDia(dia) {
+    var imp = (Number(state.configLucro.imposto) || 0) / 100;
+    var r = { vendas: [], bruto: 0, liquido: 0, imposto: 0, custo: 0, lucro: 0, semTaxas: 0, semCusto: 0, comLucro: 0 };
+    (state.transacoes || []).forEach(function (t) {
+      if (t.tipo !== 'venda' || t.data !== dia) return;
+      var c = custosDaVenda(t);
+      var valor = Number(t.valor) || 0;
+      var v = { t: t, valor: valor, plataforma: c ? c.plataforma : (String(t.origemId || '').indexOf('shopee') !== -1 ? 'shopee' : 'ml'), taxas: null, frete: null, liquido: null, imposto: valor * imp, custo: 0, lucro: null, faltaCusto: [] };
+      (t.itens || []).forEach(function (i) {
+        var cu = custoDoItem(i.item_id, t.data);
+        if (cu) v.custo += cu.valor * (Number(i.quantidade) || 1); else v.faltaCusto.push(i.titulo || i.item_id);
+      });
+      if (c) { v.taxas = c.comissao; v.frete = c.frete; v.liquido = c.liquido; }
+      if (c && !v.faltaCusto.length) v.lucro = v.liquido - v.imposto - v.custo;
+      r.bruto += valor;
+      if (c) r.liquido += v.liquido; else r.semTaxas++;
+      if (v.faltaCusto.length) r.semCusto++;
+      if (v.lucro !== null) { r.lucro += v.lucro; r.comLucro++; }
+      r.imposto += v.imposto; r.custo += v.custo;
+      r.vendas.push(v);
+    });
+    r.vendas.sort(function (a, b) { return String(b.t.dataHora || '').localeCompare(String(a.t.dataHora || '')); });
+    var a = state.adsShopee && Array.isArray(state.adsShopee.dias) ? state.adsShopee.dias.find(function (x) { return x.data === dia; }) : null;
+    r.ads = a ? Number(a.gasto) || 0 : null;
+    return r;
+  }
+
+  function tokenAtualizar() { try { return localStorage.getItem('pml_ml-gh-token') || ''; } catch (e) { return ''; } }
+
+  // Pede uma execucao da automacao agora e vai buscando os dados novos por ate 4 minutos
+  async function atualizarAgora() {
+    var tk = tokenAtualizar();
+    if (!tk) { state.pedirTokenAtualizar = true; render(); return; }
+    state.atualizandoAgora = 'Pedindo a atualização...'; render();
+    try {
+      var resp = await fetch('https://api.github.com/repos/' + REPO_AUTOMACAO + '/actions/workflows/atualizar.yml/dispatches', {
+        method: 'POST', headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + tk, 'X-GitHub-Api-Version': '2022-11-28' },
+        body: JSON.stringify({ ref: 'main' })
+      });
+      if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
+        state.atualizandoAgora = null; state.pedirTokenAtualizar = true;
+        state.erroToken = 'O GitHub recusou esse token (venceu ou não tem permissão de Actions). Cole um novo.';
+        render(); return;
+      }
+    } catch (e) { state.atualizandoAgora = null; state.errorMsg = 'Não consegui falar com o GitHub agora.'; render(); return; }
+    var antes = state.statusAuto && state.statusAuto.atualizado_em;
+    for (var i = 0; i < 12; i++) {
+      state.atualizandoAgora = 'Buscando as vendas nas plataformas... (' + (i * 20) + ' s)'; render();
+      await new Promise(function (ok) { setTimeout(ok, 20000); });
+      await sincronizarGist(true);
+      if (state.gistUrlShopee) await sincronizarGistShopee(true);
+      if (state.statusAuto && state.statusAuto.atualizado_em && state.statusAuto.atualizado_em !== antes) break;
+    }
+    state.atualizandoAgora = null; render();
+  }
+
+  function blocoTokenAtualizar() {
+    var inp = el('input', { type: 'password', placeholder: 'github_pat_...', autocomplete: 'off', style: 'min-width:260px;' });
+    return el('div', { class: 'pml-dica', style: 'margin-top:10px;' }, [
+      el('div', { html: '<b>Para atualizar na hora</b>, cole aqui o mesmo token do GitHub que está no cron-job.org (o que só tem permissão de Actions). Ele fica guardado só neste navegador.' + (state.erroToken ? '<br><b style="color:var(--bad)">' + state.erroToken + '</b>' : '') }),
+      el('div', { style: 'display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;' }, [inp, el('button', { class: 'pml-btn', text: 'Salvar e atualizar', onclick: function () {
+        if (!inp.value.trim()) return;
+        try { localStorage.setItem('pml_ml-gh-token', inp.value.trim()); } catch (e) {}
+        state.pedirTokenAtualizar = false; state.erroToken = '';
+        atualizarAgora();
+      } }), el('button', { class: 'pml-btn secondary', text: 'Agora não', onclick: function () { state.pedirTokenAtualizar = false; render(); } })])
+    ]);
+  }
+
+  function renderVendasDoDia(grid) {
+    var hoje = isoHoje(0), ontem = isoHoje(-1);
+    var dia = state.diaVendas === ontem ? ontem : hoje;
+    var r = calcVendasDoDia(dia);
+    var bloco = el('section', { class: 'ini-bloco ini-c12' });
+    var horas = horasDesdeAtualizacaoAutomacao();
+    var quando = state.statusAuto && state.statusAuto.atualizado_em ? new Date(state.statusAuto.atualizado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
+    bloco.appendChild(el('div', { class: 'cab' }, [
+      el('h3', { text: 'Vendas ' + (dia === hoje ? 'de hoje' : 'de ontem') + ', uma por uma' }),
+      el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' }, [
+        el('span', { class: 'pml-margin', text: quando ? 'buscado nas plataformas às ' + quando + (horas !== null && horas < 1.5 ? ' · próxima em até 1 h' : '') : '' }),
+        el('button', { class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;', text: dia === hoje ? 'Ver ontem' : 'Ver hoje', onclick: function () { state.diaVendas = dia === hoje ? ontem : hoje; render(); } }),
+        el('button', { class: 'pml-btn', style: 'padding:5px 10px; font-size:12px;' + (state.atualizandoAgora ? ' opacity:.7; cursor:wait;' : ''), text: state.atualizandoAgora ? '⏳ ' + state.atualizandoAgora : '↻ Atualizar agora', onclick: function () { if (!state.atualizandoAgora) atualizarAgora(); } })
+      ])
+    ]));
+    if (state.pedirTokenAtualizar) bloco.appendChild(blocoTokenAtualizar());
+
+    var lucroDia = r.lucro - (r.ads && r.semCusto < r.vendas.length ? r.ads : 0);
+    bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
+      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas')),
+      metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
+      metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
+      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg')
+    ]));
+    if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + (dia === hoje ? 'hoje' : 'ontem') + ' até a última atualização.' })); grid.appendChild(bloco); return; }
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Hora', 'Onde', 'Produto', 'Venda', 'Taxas', 'Frete', 'Cai na conta', 'Imposto', 'Custo', 'Lucro'].map(function (h, i) { return el('th', { class: i > 2 ? 'num' : '', text: h }); })));
+    r.vendas.forEach(function (v) {
+      var hora = v.t.dataHora ? new Date(v.t.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+      var prod = (v.t.itens || []).map(function (i) { return (Number(i.quantidade) > 1 ? i.quantidade + '× ' : '') + (i.titulo || i.item_id); }).join(' + ') || (v.t.descricao || '');
+      t.appendChild(el('tr', {}, [
+        el('td', { text: hora }),
+        el('td', { text: v.plataforma === 'shopee' ? 'Shopee' : 'ML' }),
+        el('td', { style: 'max-width:320px;', text: prod }),
+        el('td', { class: 'num', text: fmtMoney(v.valor) }),
+        el('td', { class: 'num', text: v.taxas === null ? 'chegando' : fmtMoney(v.taxas) }),
+        el('td', { class: 'num', text: v.frete === null ? '—' : fmtMoney(v.frete) }),
+        el('td', { class: 'num', text: v.liquido === null ? '—' : fmtMoney(v.liquido) }),
+        el('td', { class: 'num', text: fmtMoney(v.imposto) }),
+        el('td', { class: 'num', style: v.faltaCusto.length ? 'color:var(--warn);' : '', text: v.faltaCusto.length ? 'sem custo' : fmtMoney(v.custo) }),
+        el('td', { class: 'num', style: 'font-weight:700; color:' + (v.lucro === null ? 'var(--muted)' : v.lucro >= 0 ? 'var(--good)' : 'var(--bad)'), text: v.lucro === null ? '—' : fmtMoney(v.lucro) })
+      ]));
+    });
+    bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    bloco.appendChild(el('p', { class: 'pml-note', text: 'As vendas chegam pela automação de hora em hora (6h às 23h) ou na hora pelo botão Atualizar agora. Na Shopee, as taxas de um pedido às vezes só aparecem depois que ele é enviado. "Sem custo": cadastre o custo do produto na aba Lucro real ou na Calculadora 3D.' }));
+    grid.appendChild(bloco);
+  }
+
+  // Com o painel aberto, busca os dados novos sozinho a cada 10 minutos
+  if (typeof setInterval === 'function' && typeof document !== 'undefined' && document.addEventListener) {
+    setInterval(function () {
+      if (document.visibilityState === 'hidden' || state.sincronizando || state.atualizandoAgora) return;
+      if (state.gistUrl) sincronizarGist(true);
+      if (state.gistUrlShopee) sincronizarGistShopee(true);
+    }, 10 * 60 * 1000);
   }
   function render() {
     destruirGraficos();

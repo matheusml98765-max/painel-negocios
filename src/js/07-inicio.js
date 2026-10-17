@@ -68,6 +68,7 @@
     grid.appendChild(mes);
     var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
     grid.appendChild(blocoMetas(d, lucroMesCalc));
+    renderVendasDoDia(grid);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });

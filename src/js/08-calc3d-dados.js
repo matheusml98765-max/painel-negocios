@@ -70,12 +70,16 @@
   function custoGrama(tipo, dataRef) {
     var c = getCalc3d();
     var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
+    var peps = precoFifo('fil:' + String(tipo || '').toUpperCase(), dataRef);
+    if (peps !== null) return peps;
     if (!lotes.length) lotes = c.filamentos;
     return precoMedioLotes(lotesDoPeriodo(lotes, dataRef), 'kg', 1000);
   }
 
   function custoEmbalagem(nome, dataRef) {
     var c = getCalc3d();
+    var peps = precoFifo('emb:' + nome, dataRef);
+    if (peps !== null) return peps;
     return precoMedioLotes(lotesDoPeriodo(c.embalagens.filter(function (l) { return l.nome === nome; }), dataRef), 'qtd', 1);
   }
 

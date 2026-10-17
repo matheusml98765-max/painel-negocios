@@ -39,26 +39,37 @@
 
   function isoHoje(off) { var d = new Date(); d.setDate(d.getDate() + (off || 0)); return isoDia(d); }
 
-  // Estoque de cada insumo: contagem feita pelo vendedor + compras depois dela - uso pelas vendas.
+  // Estoque de cada insumo e de cada filamento: contagem feita pelo vendedor + compras depois
+  // dela - o que as vendas gastaram, pela ordem das compras (23-fifo.js).
   function calcEstoqueInsumos() {
     var c = getCalc3d();
     c.estoqueInsumos = c.estoqueInsumos || {};
+    var itens = [];
+    tiposFilamento().forEach(function (t) { if (c.filamentos.length) itens.push({ nome: nomeFilamentoEstoque(t), chave: 'fil:' + t.toUpperCase(), fator: 1000 }); });
     var nomes = {};
     c.embalagens.forEach(function (l) { if (l.nome) nomes[l.nome] = true; });
-    var uso30 = calcConsumo3d(isoHoje(-29), isoHoje(0)).insumos;
-    return Object.keys(nomes).map(function (nome) {
-      var cont = c.estoqueInsumos[nome];
-      var linha = { nome: nome, contado: !!cont, porDia: (uso30[nome] || 0) / 30 };
+    c.produtos.forEach(function (p) { (p.insumos || []).forEach(function (s) { if (s.nome && num(s.qtd) > 0) nomes[s.nome] = true; }); });
+    Object.keys(nomes).forEach(function (n) { itens.push({ nome: n, chave: 'emb:' + n, fator: 1 }); });
+    var ini = isoHoje(-29);
+    return itens.map(function (it) {
+      var uso = usoPorDia(it.chave);
+      var u30 = Object.keys(uso).reduce(function (s, d) { return s + (d >= ini ? uso[d] : 0); }, 0) / it.fator;
+      var cont = c.estoqueInsumos[it.nome];
+      var linha = { nome: it.nome, contado: !!cont, porDia: u30 / 30, semPreco: !lotesFifo(it.chave).length };
       if (cont) {
-        var comprado = c.embalagens.filter(function (l) { return l.nome === nome && l.data > cont.data; }).reduce(function (s, l) { return s + num(l.qtd); }, 0);
-        var usado = calcConsumo3d(cont.data, isoHoje(0)).insumos[nome] || 0;
+        var f = filaFifo(it.chave);
+        var usado = Object.keys(uso).reduce(function (s, d) { return s + (d >= cont.data ? uso[d] : 0); }, 0) / it.fator;
+        var comprado = lotesFifo(it.chave).filter(function (l) { return l.data > cont.data; }).reduce(function (s, l) { return s + l.qtd; }, 0) / it.fator;
         linha.sobra = num(cont.qtd) + comprado - usado;
         linha.comprado = comprado; linha.usado = usado; linha.desde = cont.data;
-        linha.dias = linha.porDia > 0 ? linha.sobra / linha.porDia : null;
+        linha.dias = linha.porDia > 0 ? Math.max(0, linha.sobra) / linha.porDia : null;
+        if (f && f.fila.length) linha.loteAtual = { data: f.fila[0].data, unit: f.fila[0].unit * it.fator, semCompra: f.fila[0].semCompra };
       }
       return linha;
     }).sort(function (a, b) { return (a.dias === undefined || a.dias === null ? 1e9 : a.dias) - (b.dias === undefined || b.dias === null ? 1e9 : b.dias); });
   }
+
+  function fmtQtd(n) { return (Math.round(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 }); }
 
   function renderLuzInsumosCards(wrap) {
     var c = getCalc3d();
@@ -107,7 +118,7 @@
     var t2 = el('table', { class: 'pml-table' });
     t2.appendChild(el('tr', {}, [el('th', { text: 'Insumo' }), el('th', { class: 'num', text: 'Usa por dia' }), el('th', { class: 'num', text: 'Sobra hoje' }), el('th', { class: 'num', text: 'Dura' }), el('th', { text: 'Contei agora' })]));
     lista.forEach(function (l) {
-      var inp = el('input', { type: 'number', step: '1', min: '0', placeholder: 'quantidade', style: 'width:110px;' });
+      var inp = el('input', { type: 'number', step: 'any', min: '0', placeholder: 'quantidade', style: 'width:110px;' });
       var btn = el('button', { class: 'pml-btn', style: 'padding:5px 10px; font-size:12px; margin-left:6px;', text: 'Salvar', onclick: function () {
         if (inp.value === '') return;
         c.estoqueInsumos = c.estoqueInsumos || {};
@@ -115,14 +126,15 @@
         salvarCalc3d(); render();
       } });
       t2.appendChild(el('tr', { class: l.dias !== undefined && l.dias !== null && l.dias <= 10 ? 'pml-row-alerta' : '' }, [
-        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + l.comprado + ' comprados · −' + Math.round(l.usado) + ' usados' }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' })]),
+        el('td', {}, [el('div', { text: l.nome }), l.contado ? el('div', { class: 'pml-margin', text: 'contado em ' + l.desde.split('-').reverse().join('/') + ' · +' + fmtQtd(l.comprado) + ' comprados · −' + fmtQtd(l.usado) + ' usados nas vendas' + (l.loteAtual ? ' · usando agora a compra de ' + (l.loteAtual.semCompra ? 'antes do cadastro' : l.loteAtual.data.split('-').reverse().join('/')) + ' (' + fmtMoney(l.loteAtual.unit) + ' cada)' : '') }) : el('div', { class: 'pml-margin', text: 'conte quantos tem hoje' }), l.semPreco ? el('div', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta cadastrar a compra (preço)' }) : null].filter(Boolean)),
         el('td', { class: 'num', text: l.porDia ? l.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
-        el('td', { class: 'num', style: 'font-weight:700;', text: l.contado ? Math.round(l.sobra).toLocaleString('pt-BR') : '—' }),
+        el('td', { class: 'num', style: 'font-weight:700;', text: l.contado ? fmtQtd(l.sobra) : '—' }),
         el('td', { class: 'num', text: l.dias === undefined ? '—' : (l.dias === null ? 'sem uso' : Math.max(0, Math.round(l.dias)) + ' dias') }),
         el('td', {}, [inp, btn])
       ]));
     });
     ci.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
-    ci.appendChild(el('p', { class: 'pml-note', text: 'Conte uma vez quanto tem de cada insumo e salve. Depois, cada compra cadastrada em "Embalagens e insumos" soma, e cada venda tira a quantidade que a peça usa (campo Insumos de cada peça). Fita em cm.' }));
+    ci.appendChild(el('p', { class: 'pml-note', text: 'Conte uma vez quanto tem de cada insumo e salve. Depois, cada compra cadastrada soma, e cada venda tira o que a peça usa (ex.: papel higiênico com parafuso tira 2 pares de parafuso e bucha e 120 cm de plástico bolha). Fita e plástico bolha em cm; filamento em kg (o que as vendas gastam: peças impressas para estoque e falhas ainda não entram). O custo de cada venda usa a compra que estava sendo gasta naquele dia: a mais antiga primeiro.' }));
+    ci.appendChild(el('p', { class: 'pml-note', text: 'Se a sobra ficar negativa, faltou cadastrar alguma compra.' }));
     wrap.appendChild(ci);
   }

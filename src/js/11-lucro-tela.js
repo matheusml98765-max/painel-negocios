@@ -12,7 +12,7 @@
     var filtros = el('div', { class: 'pml-filtros' });
     function campo(label, input) { return el('div', { class: 'pml-field' }, [el('label', { text: label }), input]); }
     var selDias = el('select', { onchange: function () { cfg.dias = Number(selDias.value); salvarConfigLucro(); render(); } },
-      [7, 15, 30].map(function (d) { var o = el('option', { value: d, text: 'Últimos ' + d + ' dias' }); if (d === dias) o.setAttribute('selected', ''); return o; }));
+      [1, 7, 15, 30].map(function (d) { var o = el('option', { value: d, text: d === 1 ? 'Hoje' : 'Últimos ' + d + ' dias' }); if (d === dias) o.setAttribute('selected', ''); return o; }));
     var inpImp = el('input', { type: 'number', step: '0.1', value: cfg.imposto, onchange: function () { cfg.imposto = Number(inpImp.value) || 0; salvarConfigLucro(); render(); } });
     var inpAlvo = el('input', { type: 'number', step: '1', value: cfg.margemAlvo, onchange: function () { cfg.margemAlvo = Number(inpAlvo.value) || 0; salvarConfigLucro(); render(); } });
     var selOrdem = el('select', { onchange: function () { cfg.ordem = selOrdem.value; salvarConfigLucro(); render(); } },
@@ -48,14 +48,14 @@
     var levou = tot.receita ? 1 - tot.liquido / tot.receita : 0;
 
     var metr = el('div', { class: 'pml-metrics' }, [
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + dias + ' dias)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão, taxas e frete' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: nomePlat + ' ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
     ]);
     if (ads && ads.gasto > 0) {
       metr.appendChild(el('div', { class: 'pml-metric' }, [
-        el('p', { class: 'pml-metric-label', text: 'Shopee Ads (' + dias + ' dias)' }),
+        el('p', { class: 'pml-metric-label', text: 'Shopee Ads (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }),
         el('p', { class: 'pml-metric-value neg', text: fmtMoney(ads.gasto) }),
         el('p', { class: 'pml-margin', text: 'trouxe ' + fmtMoney(ads.vendas) + ' em vendas' + (tot.receitaComCusto ? '. Lucro depois do Ads: ' + fmtMoney(tot.lucro - ads.gasto) : '. Cadastre o custo das peças para ver o lucro depois do Ads.') })
       ]));

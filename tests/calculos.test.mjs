@@ -239,3 +239,44 @@ test('contas: fixas, parcelas, fatura do cartão e imposto estimado', () => {
   assert.equal(pa[0].restantes, 8); perto(pa[0].falta, 2400, 'falta impressora'); assert.equal(pa[0].acaba, '2027-05');
   assert.equal(p.contasDoMes('2027-06').some((l) => l.id === 'p001' || (l.itens || []).some((i) => i.conta.id === 'p001')), false);
 });
+
+test('PEPS: usa primeiro a compra mais antiga; compra nova só vale quando a anterior acaba', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.perdaPct = 0;
+  c.embalagens = [
+    { nome: 'Parafuso + bucha (par)', data: '2026-09-01', qtd: 500, preco: 100, frete: 0 }, // 0,20
+    { nome: 'Parafuso + bucha (par)', data: '2026-10-29', qtd: 500, preco: 50, frete: 0 },  // 0,10
+  ];
+  c.estoqueInsumos = { 'Parafuso + bucha (par)': { qtd: 4, data: '2026-10-01' } };
+  c.produtos = [{ id: 'x', nome: 'Papel', tipo: 'PETG', gramas: 10, horas: 1, porPlaca: 1, anuncios: 'MLB1', insumos: [{ nome: 'Parafuso + bucha (par)', qtd: 2 }] }];
+  p.state.transacoes = [
+    { tipo: 'venda', data: '2026-10-10', valor: 30, itens: [{ item_id: 'MLB1', quantidade: 1 }] },
+    { tipo: 'venda', data: '2026-10-30', valor: 30, itens: [{ item_id: 'MLB1', quantidade: 2 }] },
+  ];
+  perto(p.custoEmbalagem('Parafuso + bucha (par)', '2026-10-10'), 0.2, 'gasta o lote antigo');
+  // dia 30: sobram 2 pares do lote antigo (0,20) e usa 2 do novo (0,10) => média 0,15
+  perto(p.custoEmbalagem('Parafuso + bucha (par)', '2026-10-30'), 0.15, 'mistura no fim do lote');
+  perto(p.custoEmbalagem('Parafuso + bucha (par)', '2026-11-05'), 0.1, 'depois: lote novo');
+  const f = p.filaFifo('emb:Parafuso + bucha (par)');
+  perto(f.sobra, 498, 'sobra 4 - 2 - 4 + 500');
+  // antes da contagem: regra antiga
+  perto(p.custoEmbalagem('Parafuso + bucha (par)', '2026-09-15'), 0.2, 'antes da contagem');
+});
+
+test('vendas do dia: taxas, imposto, custo e lucro de cada venda', () => {
+  const p = painelBase();
+  p.state.configLucro.imposto = 4;
+  p.state.custosAvulsos = { MLB9: 10 };
+  p.state.transacoes = [
+    { tipo: 'venda', data: '2026-10-17', valor: 50, itens: [{ item_id: 'MLB9', quantidade: 1, comissao: 6 }], custosMl: { comissao: 6, frete: 4, liquido_recebido: 40 } },
+    { tipo: 'venda', data: '2026-10-17', valor: 30, origemId: 'api-shopee-1', itens: [{ item_id: '999', quantidade: 1 }] },
+    { tipo: 'venda', data: '2026-10-16', valor: 99, itens: [] },
+  ];
+  const r = p.calcVendasDoDia('2026-10-17');
+  assert.equal(r.vendas.length, 2);
+  const ml = r.vendas.find((v) => v.plataforma === 'ml');
+  perto(ml.lucro, 40 - 2 - 10, 'lucro da venda ML');
+  assert.equal(r.semTaxas, 1); assert.equal(r.semCusto, 1);
+  perto(r.bruto, 80, 'vendido');
+});
