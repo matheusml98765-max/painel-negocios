@@ -332,7 +332,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '' };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -427,6 +427,10 @@
       state.faturamento = fa ? JSON.parse(fa.value) : null;
     } catch (e) { state.faturamento = null; }
     try {
+      var an = await window.storage.get('ml-anuncios');
+      state.anunciosMl = an ? JSON.parse(an.value) : null;
+    } catch (e) { state.anunciosMl = null; }
+    try {
       var ads = await window.storage.get('ml-ads-shopee');
       state.adsShopee = ads ? JSON.parse(ads.value) : null;
     } catch (e) { state.adsShopee = null; }
@@ -496,6 +500,20 @@
     } catch (e) {}
   }
 
+  // Estoque e Product Ads dos anuncios do ML (anuncios_ml.json da automacao)
+  async function sincronizarAnunciosMl() {
+    if (!state.gistUrl) return;
+    try {
+      var r = await fetch(urlArquivoIrmao(state.gistUrl, 'anuncios_ml.json') + '?_=' + Date.now());
+      if (!r.ok) return;
+      var dados = await r.json();
+      if (dados && Array.isArray(dados.itens)) {
+        state.anunciosMl = dados;
+        try { await window.storage.set('ml-anuncios', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
   async function sincronizarAdsShopee() {
     if (!state.gistUrlShopee) return;
     try {
@@ -540,6 +558,7 @@
         await saveTransacoes();
       }
       await sincronizarFaturamento();
+      await sincronizarAnunciosMl();
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
       state.errorMsg = '';
@@ -2412,10 +2431,10 @@
       ]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads da Shopee aparece no card acima e, por produto, logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads aparece por produto logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
-    if (plat !== 'ml') renderAdsPorProduto(wrap);
+    renderAdsPorProduto(wrap, plat);
     renderFaturaCard(wrap);
   }
 
@@ -2761,34 +2780,42 @@
     return res;
   }
 
-  // Shopee Ads por anuncio, comparado com a margem do produto antes do Ads.
+  // Ads por anuncio (Shopee Ads e Product Ads do ML), comparado com a margem do produto antes do Ads.
   // decisao: 'aumentar' | 'manter' | 'pausar' | 'sem-custo' | 'pouco-dado'
-  function calcAdsPorProduto() {
-    var a = state.adsShopee;
-    if (!a || !a.por_item || !Object.keys(a.por_item).length) return null;
-    var dias = Number(a.por_item_dias) || 30;
-    var mapa = {};
-    calcLucroPorProduto(dias, 'shopee').linhas.forEach(function (g) { mapa[String(g.itemId)] = g; });
-    var linhas = Object.keys(a.por_item).map(function (id) {
-      var x = a.por_item[id];
-      var g = mapa[String(id)] || null;
-      var acos = x.vendas > 0 ? x.gasto / x.vendas : null;
-      var margem = g && g.margem !== null ? g.margem : null;
-      var decisao;
-      if (x.vendas === 0 && x.gasto < 15) decisao = 'pouco-dado';
-      else if (margem === null) decisao = 'sem-custo';
-      else if (acos === null || acos > margem) decisao = 'pausar';
-      else if (acos < margem * 0.5) decisao = 'aumentar';
-      else decisao = 'manter';
-      var nomeCamp = (x.campanhas || []).map(function (c) { return c.nome; }).filter(Boolean)[0];
-      return {
-        itemId: id, titulo: g ? g.titulo : (nomeCamp || 'Anúncio ' + id), gasto: x.gasto, vendasAds: x.vendas, pedidosAds: x.pedidos,
-        cliques: x.cliques, acos: acos, margem: margem, lucro: g ? g.lucro : null,
-        lucroDepois: g && g.lucro !== null ? g.lucro - x.gasto : null, decisao: decisao, campanhas: x.campanhas || []
-      };
+  function calcAdsPorProduto(plataforma) {
+    plataforma = plataforma || 'todas';
+    var fontes = [];
+    var sp = state.adsShopee, ml = state.anunciosMl && state.anunciosMl.ads;
+    if ((plataforma === 'todas' || plataforma === 'shopee') && sp && sp.por_item && Object.keys(sp.por_item).length) fontes.push({ plat: 'shopee', dias: Number(sp.por_item_dias) || 30, por_item: sp.por_item });
+    if ((plataforma === 'todas' || plataforma === 'ml') && ml && ml.por_item && Object.keys(ml.por_item).length) fontes.push({ plat: 'ml', dias: Number(ml.dias) || 30, por_item: ml.por_item });
+    if (!fontes.length) return null;
+    var linhas = [];
+    fontes.forEach(function (f) {
+      var mapa = {};
+      calcLucroPorProduto(f.dias, f.plat).linhas.forEach(function (g) { mapa[String(g.itemId).toUpperCase()] = g; });
+      var titulos = {};
+      ((state.anunciosMl && state.anunciosMl.itens) || []).forEach(function (it) { titulos[it.id] = it.titulo; });
+      Object.keys(f.por_item).forEach(function (id) {
+        var x = f.por_item[id];
+        var g = mapa[String(id).toUpperCase()] || null;
+        var acos = x.vendas > 0 ? x.gasto / x.vendas : null;
+        var margem = g && g.margem !== null ? g.margem : null;
+        var decisao;
+        if (x.vendas === 0 && x.gasto < 15) decisao = 'pouco-dado';
+        else if (margem === null) decisao = 'sem-custo';
+        else if (acos === null || acos > margem) decisao = 'pausar';
+        else if (acos < margem * 0.5) decisao = 'aumentar';
+        else decisao = 'manter';
+        var nomeCamp = (x.campanhas || []).map(function (c) { return c.nome; }).filter(Boolean)[0];
+        linhas.push({
+          itemId: id, plataforma: f.plat, titulo: g ? g.titulo : (titulos[id] || nomeCamp || 'Anúncio ' + id), gasto: x.gasto, vendasAds: x.vendas, pedidosAds: x.pedidos,
+          cliques: x.cliques, acos: acos, margem: margem, lucro: g ? g.lucro : null,
+          lucroDepois: g && g.lucro !== null ? g.lucro - x.gasto : null, decisao: decisao, campanhas: x.campanhas || [], nomeCampanha: nomeCamp || ''
+        });
+      });
     });
     linhas.sort(function (p, q) { return q.gasto - p.gasto; });
-    return { dias: dias, linhas: linhas };
+    return { dias: fontes[0].dias, linhas: linhas, plataformas: fontes.map(function (f) { return f.plat; }) };
   }
 
   // Unidades vendidas por anuncio nos ultimos N dias.
@@ -2805,22 +2832,34 @@
     return u;
   }
 
-  // Quanto tempo o estoque cadastrado aguenta e quanto comprar.
+  // Quanto tempo o estoque aguenta e quanto comprar.
+  // Usa o estoque real dos anuncios do ML (automacao) e, para o resto, a quantidade cadastrada na aba Estoque.
   // prazo = dias que o fornecedor leva para entregar; cobrir = dias de venda a garantir depois que chegar.
   function calcReposicao(prazo, cobrir) {
     prazo = prazo || 10; cobrir = cobrir || 30;
     var u = unidadesPorItem(30);
-    return state.produtos.filter(function (p) { return p.mlItemId; }).map(function (p) {
-      var id = String(p.mlItemId).trim().toUpperCase();
-      var qtd = Number(p.quantidade) || 0;
+    var lista = [], vistos = {};
+    function linha(nome, id, qtd, fonte, extra) {
       var porDia = (u[id] || 0) / 30;
       var cobertura = porDia > 0 ? qtd / porDia : null;
       var comprar = porDia > 0 ? Math.max(0, Math.ceil(porDia * (prazo + cobrir) - qtd)) : 0;
       var situacao = porDia === 0 ? 'parado' : (cobertura <= prazo ? 'urgente' : (cobertura <= prazo + 7 ? 'logo' : 'ok'));
       var fim = cobertura === null ? null : new Date(Date.now() + cobertura * 864e5);
-      return { produto: p, itemId: id, estoque: qtd, porDia: porDia, cobertura: cobertura, acabaEm: fim, comprar: comprar, situacao: situacao };
-    }).sort(function (a, b) {
-      return (a.cobertura === null ? 1e9 : a.cobertura) - (b.cobertura === null ? 1e9 : b.cobertura);
+      return Object.assign({ produto: { nome: nome }, itemId: id, estoque: qtd, porDia: porDia, cobertura: cobertura, acabaEm: fim, comprar: comprar, situacao: situacao, fonte: fonte }, extra || {});
+    }
+    ((state.anunciosMl && state.anunciosMl.itens) || []).forEach(function (it) {
+      if (it.status !== 'active' && !u[it.id]) return;
+      vistos[it.id] = true;
+      lista.push(linha(it.titulo, it.id, Number(it.estoque) || 0, 'ml', { full: !!it.full, pausado: it.status !== 'active' }));
+    });
+    state.produtos.filter(function (p) { return p.mlItemId; }).forEach(function (p) {
+      var id = String(p.mlItemId).trim().toUpperCase();
+      if (vistos[id]) return;
+      lista.push(linha(p.nome, id, Number(p.quantidade) || 0, 'manual'));
+    });
+    var ordem = { urgente: 0, logo: 1, ok: 2, parado: 3 };
+    return lista.sort(function (a, b) {
+      return ordem[a.situacao] - ordem[b.situacao] || (a.cobertura === null ? 1e9 : a.cobertura) - (b.cobertura === null ? 1e9 : b.cobertura);
     });
   }
 
@@ -2961,7 +3000,7 @@
     var a = ads && ads.linhas.find(function (x) { return mesmoItem(x.itemId, id); });
     if (a) {
       var dec = DECISAO_ADS[a.decisao];
-      card.appendChild(el('h4', { class: 'ficha-sub', text: 'Shopee Ads (' + ads.dias + ' dias)' }));
+      card.appendChild(el('h4', { class: 'ficha-sub', text: (a.plataforma === 'ml' ? 'Product Ads do ML' : 'Shopee Ads') + ' (' + ads.dias + ' dias)' }));
       card.appendChild(el('div', { class: 'pml-dica', html: 'Gastou <b>' + fmtMoney(a.gasto) + '</b> e trouxe <b>' + fmtMoney(a.vendasAds) + '</b> em ' + a.pedidosAds + ' pedido(s). O Ads levou <b>' + fmtPct(a.acos) + '</b> de cada venda; sua margem antes do Ads é ' + fmtPct(a.margem) + '. <span class="pml-tag ' + dec.tag + '">' + dec.texto + '</span><br>' + dec.dica }));
     }
     wrap.appendChild(card);
@@ -2971,11 +3010,12 @@
     return el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: rotulo }), el('p', { class: 'pml-metric-value ' + (classe || ''), text: valor }), el('p', { class: 'pml-margin', text: sub || '' })]);
   }
 
-  function renderAdsPorProduto(wrap) {
-    var ads = calcAdsPorProduto();
+  function renderAdsPorProduto(wrap, plataforma) {
+    var ads = calcAdsPorProduto(plataforma);
     if (!ads) return;
     var card = el('div', { class: 'pml-card' });
-    card.appendChild(el('p', { class: 'pml-section-title', text: 'Shopee Ads por produto (' + ads.dias + ' dias)' }));
+    var nomeAds = ads.plataformas.length > 1 ? 'Ads por produto (ML e Shopee' : (ads.plataformas[0] === 'ml' ? 'Product Ads do ML por produto (' : 'Shopee Ads por produto (');
+    card.appendChild(el('p', { class: 'pml-section-title', text: nomeAds + (ads.plataformas.length > 1 ? ', ' : '') + ads.dias + ' dias)' }));
     var t = el('table', { class: 'pml-table' });
     t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { class: 'num', text: 'Lucro depois do Ads' }), el('th', { text: 'O que fazer' })]));
     var economia = 0;
@@ -2983,7 +3023,10 @@
       var dec = DECISAO_ADS[a.decisao];
       if (a.decisao === 'pausar') economia += a.gasto;
       t.appendChild(el('tr', { class: a.decisao === 'pausar' ? 'pml-row-alerta' : '' }, [
-        el('td', {}, [el('button', { class: 'pml-link-prod', title: 'Abrir a ficha do produto', text: a.titulo, onclick: function () { state.tab = 'lucro'; abrirFichaProduto(a.itemId); } })]),
+        el('td', {}, [
+          el('button', { class: 'pml-link-prod', title: 'Abrir a ficha do produto', text: a.titulo, onclick: function () { state.tab = 'lucro'; abrirFichaProduto(a.itemId); } }),
+          el('div', { class: 'pml-margin', text: (a.plataforma === 'ml' ? 'Mercado Livre ' : 'Shopee ') + a.itemId + (a.plataforma === 'ml' && a.nomeCampanha ? ' · ' + a.nomeCampanha : '') })
+        ]),
         el('td', { class: 'num', text: fmtMoney(a.gasto) }),
         el('td', { class: 'num', text: fmtMoney(a.vendasAds) + ' · ' + a.pedidosAds + ' ped.' }),
         el('td', { class: 'num', text: fmtPct(a.acos) }),
@@ -2994,7 +3037,7 @@
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
     if (economia > 0) card.appendChild(el('div', { class: 'pml-dica', style: 'margin-top:12px;', html: '💡 Os anúncios marcados para pausar gastaram <b>' + fmtMoney(economia) + '</b> em ' + ads.dias + ' dias sem dar lucro.' }));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Ads levou</b> = gasto ÷ vendas que vieram do Ads (ACOS). Se for maior que a <b>margem</b> do produto, cada venda pelo Ads dá prejuízo. Regra: Ads abaixo da metade da margem → aumentar; entre metade e a margem → manter; acima → pausar ou baixar o lance. Campanha com vários anúncios é dividida igualmente entre eles.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Ads levou</b> = gasto ÷ vendas que vieram do Ads (ACOS). Se for maior que a <b>margem</b> do produto, cada venda pelo Ads dá prejuízo. Regra: Ads abaixo da metade da margem → aumentar; entre metade e a margem → manter; acima → pausar ou baixar o lance. Na Shopee, campanha com vários anúncios é dividida igualmente entre eles. No ML o gasto já vem por anúncio; parte do Product Ads do ML pode ser bonificada (veja Estornos e bonificações na fatura).' }));
     wrap.appendChild(card);
   }
 
@@ -3021,19 +3064,28 @@
       var nomes = { urgente: ['prejuizo', 'comprar já'], logo: ['baixa', 'comprar logo'], ok: ['boa', 'tranquilo'], parado: ['baixa', 'sem vendas'] };
       var t = el('table', { class: 'pml-table' });
       t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Estoque' }), el('th', { class: 'num', text: 'Vende por dia' }), el('th', { class: 'num', text: 'Dura até' }), el('th', { class: 'num', text: 'Comprar' }), el('th', { text: '' })]));
-      lista.forEach(function (r) {
+      var parados = lista.filter(function (r) { return r.situacao === 'parado'; });
+      function linhaRep(r) {
         var n = nomes[r.situacao];
-        t.appendChild(el('tr', { class: r.situacao === 'urgente' ? 'pml-row-alerta' : (r.situacao === 'logo' ? 'pml-row-atencao' : '') }, [
-          el('td', { text: r.produto.nome }),
+        return el('tr', { class: r.situacao === 'urgente' ? 'pml-row-alerta' : (r.situacao === 'logo' ? 'pml-row-atencao' : '') }, [
+          el('td', {}, [el('div', { class: 'pml-titulo-prod', text: r.produto.nome }), el('div', { class: 'pml-margin', text: (r.fonte === 'ml' ? 'ML ' + r.itemId + (r.full ? ' · Full' : '') + (r.pausado ? (r.estoque <= 0 ? ' · pausado por falta de estoque' : ' · pausado') : '') + ' · estoque automático' : r.itemId + ' · estoque cadastrado') })]),
           el('td', { class: 'num', text: String(r.estoque) }),
           el('td', { class: 'num', text: r.porDia ? r.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
-          el('td', { class: 'num', text: r.acabaEm ? r.acabaEm.toLocaleDateString('pt-BR') + ' (' + Math.round(r.cobertura) + ' d)' : '—' }),
+          el('td', { class: 'num', style: r.estoque <= 0 && r.porDia ? 'color:var(--bad); font-weight:700;' : '', text: r.estoque <= 0 && r.porDia ? 'esgotado' : (r.acabaEm ? r.acabaEm.toLocaleDateString('pt-BR') + ' (' + Math.round(r.cobertura) + ' d)' : '—') }),
           el('td', { class: 'num', style: 'font-weight:700;', text: r.comprar ? r.comprar + ' un.' : '—' }),
           el('td', {}, [el('span', { class: 'pml-tag ' + n[0], style: 'margin-left:0;', text: n[1] })])
-        ]));
-      });
+        ]);
+      }
+      lista.filter(function (r) { return r.situacao !== 'parado'; }).forEach(function (r) { t.appendChild(linhaRep(r)); });
       card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-      card.appendChild(el('p', { class: 'pml-note', text: 'Usa a quantidade cadastrada abaixo (ela já baixa sozinha a cada venda) e a média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
+      if (parados.length) {
+        var det = el('details', { class: 'pml-fat-cat' }, [el('summary', { text: parados.length + ' anúncio(s) sem venda nos últimos 30 dias' })]);
+        var t2 = el('table', { class: 'pml-table' });
+        parados.forEach(function (r) { t2.appendChild(linhaRep(r)); });
+        det.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
+        card.appendChild(det);
+      }
+      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
     } else {
       card.appendChild(el('p', { class: 'pml-note', text: 'Para ver quando cada produto acaba, cadastre abaixo a quantidade em estoque e o código do anúncio.' }));
     }
@@ -3111,7 +3163,7 @@
     });
     var adsProd = calcAdsPorProduto();
     if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'pausar'; }).forEach(function (a) {
-      itens.push({ valor: a.gasto, tipo: 'ads', texto: 'Shopee Ads de <b>' + a.titulo + '</b> gastou ' + fmtMoney(a.gasto) + ' nos últimos ' + adsProd.dias + ' dias, com o Ads levando ' + fmtPct(a.acos) + ' de cada venda (margem ' + fmtPct(a.margem) + ').', acao: 'Pause ou baixe o lance do Ads de ' + curto(a.titulo) + '.' });
+      itens.push({ valor: a.gasto, tipo: 'ads', texto: (a.plataforma === 'ml' ? 'Product Ads do ML' : 'Shopee Ads') + ' de <b>' + a.titulo + '</b> gastou ' + fmtMoney(a.gasto) + ' nos últimos ' + adsProd.dias + ' dias, com o Ads levando ' + fmtPct(a.acos) + ' de cada venda (margem ' + fmtPct(a.margem) + ').', acao: 'Pause ou baixe o lance do Ads de ' + curto(a.titulo) + '.' });
     });
     var fat = state.faturamento && (state.faturamento.periodos || []).find(function (p) { return String(p.chave || '').slice(0, 7) === mes; });
     if (fat) {

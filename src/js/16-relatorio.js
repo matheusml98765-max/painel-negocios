@@ -70,7 +70,7 @@
     });
     var adsProd = calcAdsPorProduto();
     if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'pausar'; }).forEach(function (a) {
-      itens.push({ valor: a.gasto, tipo: 'ads', texto: 'Shopee Ads de <b>' + a.titulo + '</b> gastou ' + fmtMoney(a.gasto) + ' nos últimos ' + adsProd.dias + ' dias, com o Ads levando ' + fmtPct(a.acos) + ' de cada venda (margem ' + fmtPct(a.margem) + ').', acao: 'Pause ou baixe o lance do Ads de ' + curto(a.titulo) + '.' });
+      itens.push({ valor: a.gasto, tipo: 'ads', texto: (a.plataforma === 'ml' ? 'Product Ads do ML' : 'Shopee Ads') + ' de <b>' + a.titulo + '</b> gastou ' + fmtMoney(a.gasto) + ' nos últimos ' + adsProd.dias + ' dias, com o Ads levando ' + fmtPct(a.acos) + ' de cada venda (margem ' + fmtPct(a.margem) + ').', acao: 'Pause ou baixe o lance do Ads de ' + curto(a.titulo) + '.' });
     });
     var fat = state.faturamento && (state.faturamento.periodos || []).find(function (p) { return String(p.chave || '').slice(0, 7) === mes; });
     if (fat) {

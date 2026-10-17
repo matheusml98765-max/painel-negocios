@@ -24,7 +24,7 @@ O GitHub Actions (`.github/workflows/checar.yml`) roda os dois e a checagem de s
 
 - O repositório e o site são **públicos**. Nunca coloque aqui custos, tokens, URL do Gist ou dados de clientes.
 - Custos, URL do Gist e configurações ficam no `localStorage` do navegador do usuário (chaves `pml_*`). Trocar de navegador ou limpar dados apaga os custos.
-- Formato dos arquivos do Gist: `pedidos_classificados.json` (ML, com `custos_ml`), `faturamento.json`, `pedidos_shopee.json` (com `custos_shopee`) e `ads_shopee.json` (com `por_item`: Ads de cada anúncio em 30 dias) e `status.json` (hora da última execução, usada no aviso de automação parada). Quem gera é o `automacao-mercado-livre`; mudou o formato lá, ajuste `05-importar.js` e `10-lucro-calculos.js` aqui.
+- Formato dos arquivos do Gist: `pedidos_classificados.json` (ML, com `custos_ml`), `faturamento.json`, `pedidos_shopee.json` (com `custos_shopee`) e `ads_shopee.json` (com `por_item`: Ads de cada anúncio em 30 dias) `anuncios_ml.json` (estoque real e Product Ads de cada anúncio do ML) e `status.json` (hora da última execução, usada no aviso de automação parada). Quem gera é o `automacao-mercado-livre`; mudou o formato lá, ajuste `05-importar.js` e `10-lucro-calculos.js` aqui.
 
 ## Acordos
 

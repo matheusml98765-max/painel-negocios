@@ -106,7 +106,7 @@
     var a = ads && ads.linhas.find(function (x) { return mesmoItem(x.itemId, id); });
     if (a) {
       var dec = DECISAO_ADS[a.decisao];
-      card.appendChild(el('h4', { class: 'ficha-sub', text: 'Shopee Ads (' + ads.dias + ' dias)' }));
+      card.appendChild(el('h4', { class: 'ficha-sub', text: (a.plataforma === 'ml' ? 'Product Ads do ML' : 'Shopee Ads') + ' (' + ads.dias + ' dias)' }));
       card.appendChild(el('div', { class: 'pml-dica', html: 'Gastou <b>' + fmtMoney(a.gasto) + '</b> e trouxe <b>' + fmtMoney(a.vendasAds) + '</b> em ' + a.pedidosAds + ' pedido(s). O Ads levou <b>' + fmtPct(a.acos) + '</b> de cada venda; sua margem antes do Ads é ' + fmtPct(a.margem) + '. <span class="pml-tag ' + dec.tag + '">' + dec.texto + '</span><br>' + dec.dica }));
     }
     wrap.appendChild(card);
@@ -116,11 +116,12 @@
     return el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: rotulo }), el('p', { class: 'pml-metric-value ' + (classe || ''), text: valor }), el('p', { class: 'pml-margin', text: sub || '' })]);
   }
 
-  function renderAdsPorProduto(wrap) {
-    var ads = calcAdsPorProduto();
+  function renderAdsPorProduto(wrap, plataforma) {
+    var ads = calcAdsPorProduto(plataforma);
     if (!ads) return;
     var card = el('div', { class: 'pml-card' });
-    card.appendChild(el('p', { class: 'pml-section-title', text: 'Shopee Ads por produto (' + ads.dias + ' dias)' }));
+    var nomeAds = ads.plataformas.length > 1 ? 'Ads por produto (ML e Shopee' : (ads.plataformas[0] === 'ml' ? 'Product Ads do ML por produto (' : 'Shopee Ads por produto (');
+    card.appendChild(el('p', { class: 'pml-section-title', text: nomeAds + (ads.plataformas.length > 1 ? ', ' : '') + ads.dias + ' dias)' }));
     var t = el('table', { class: 'pml-table' });
     t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { class: 'num', text: 'Lucro depois do Ads' }), el('th', { text: 'O que fazer' })]));
     var economia = 0;
@@ -128,7 +129,10 @@
       var dec = DECISAO_ADS[a.decisao];
       if (a.decisao === 'pausar') economia += a.gasto;
       t.appendChild(el('tr', { class: a.decisao === 'pausar' ? 'pml-row-alerta' : '' }, [
-        el('td', {}, [el('button', { class: 'pml-link-prod', title: 'Abrir a ficha do produto', text: a.titulo, onclick: function () { state.tab = 'lucro'; abrirFichaProduto(a.itemId); } })]),
+        el('td', {}, [
+          el('button', { class: 'pml-link-prod', title: 'Abrir a ficha do produto', text: a.titulo, onclick: function () { state.tab = 'lucro'; abrirFichaProduto(a.itemId); } }),
+          el('div', { class: 'pml-margin', text: (a.plataforma === 'ml' ? 'Mercado Livre ' : 'Shopee ') + a.itemId + (a.plataforma === 'ml' && a.nomeCampanha ? ' · ' + a.nomeCampanha : '') })
+        ]),
         el('td', { class: 'num', text: fmtMoney(a.gasto) }),
         el('td', { class: 'num', text: fmtMoney(a.vendasAds) + ' · ' + a.pedidosAds + ' ped.' }),
         el('td', { class: 'num', text: fmtPct(a.acos) }),
@@ -139,7 +143,7 @@
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
     if (economia > 0) card.appendChild(el('div', { class: 'pml-dica', style: 'margin-top:12px;', html: '💡 Os anúncios marcados para pausar gastaram <b>' + fmtMoney(economia) + '</b> em ' + ads.dias + ' dias sem dar lucro.' }));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Ads levou</b> = gasto ÷ vendas que vieram do Ads (ACOS). Se for maior que a <b>margem</b> do produto, cada venda pelo Ads dá prejuízo. Regra: Ads abaixo da metade da margem → aumentar; entre metade e a margem → manter; acima → pausar ou baixar o lance. Campanha com vários anúncios é dividida igualmente entre eles.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Ads levou</b> = gasto ÷ vendas que vieram do Ads (ACOS). Se for maior que a <b>margem</b> do produto, cada venda pelo Ads dá prejuízo. Regra: Ads abaixo da metade da margem → aumentar; entre metade e a margem → manter; acima → pausar ou baixar o lance. Na Shopee, campanha com vários anúncios é dividida igualmente entre eles. No ML o gasto já vem por anúncio; parte do Product Ads do ML pode ser bonificada (veja Estornos e bonificações na fatura).' }));
     wrap.appendChild(card);
   }
 
@@ -166,19 +170,28 @@
       var nomes = { urgente: ['prejuizo', 'comprar já'], logo: ['baixa', 'comprar logo'], ok: ['boa', 'tranquilo'], parado: ['baixa', 'sem vendas'] };
       var t = el('table', { class: 'pml-table' });
       t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Estoque' }), el('th', { class: 'num', text: 'Vende por dia' }), el('th', { class: 'num', text: 'Dura até' }), el('th', { class: 'num', text: 'Comprar' }), el('th', { text: '' })]));
-      lista.forEach(function (r) {
+      var parados = lista.filter(function (r) { return r.situacao === 'parado'; });
+      function linhaRep(r) {
         var n = nomes[r.situacao];
-        t.appendChild(el('tr', { class: r.situacao === 'urgente' ? 'pml-row-alerta' : (r.situacao === 'logo' ? 'pml-row-atencao' : '') }, [
-          el('td', { text: r.produto.nome }),
+        return el('tr', { class: r.situacao === 'urgente' ? 'pml-row-alerta' : (r.situacao === 'logo' ? 'pml-row-atencao' : '') }, [
+          el('td', {}, [el('div', { class: 'pml-titulo-prod', text: r.produto.nome }), el('div', { class: 'pml-margin', text: (r.fonte === 'ml' ? 'ML ' + r.itemId + (r.full ? ' · Full' : '') + (r.pausado ? (r.estoque <= 0 ? ' · pausado por falta de estoque' : ' · pausado') : '') + ' · estoque automático' : r.itemId + ' · estoque cadastrado') })]),
           el('td', { class: 'num', text: String(r.estoque) }),
           el('td', { class: 'num', text: r.porDia ? r.porDia.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0' }),
-          el('td', { class: 'num', text: r.acabaEm ? r.acabaEm.toLocaleDateString('pt-BR') + ' (' + Math.round(r.cobertura) + ' d)' : '—' }),
+          el('td', { class: 'num', style: r.estoque <= 0 && r.porDia ? 'color:var(--bad); font-weight:700;' : '', text: r.estoque <= 0 && r.porDia ? 'esgotado' : (r.acabaEm ? r.acabaEm.toLocaleDateString('pt-BR') + ' (' + Math.round(r.cobertura) + ' d)' : '—') }),
           el('td', { class: 'num', style: 'font-weight:700;', text: r.comprar ? r.comprar + ' un.' : '—' }),
           el('td', {}, [el('span', { class: 'pml-tag ' + n[0], style: 'margin-left:0;', text: n[1] })])
-        ]));
-      });
+        ]);
+      }
+      lista.filter(function (r) { return r.situacao !== 'parado'; }).forEach(function (r) { t.appendChild(linhaRep(r)); });
       card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-      card.appendChild(el('p', { class: 'pml-note', text: 'Usa a quantidade cadastrada abaixo (ela já baixa sozinha a cada venda) e a média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
+      if (parados.length) {
+        var det = el('details', { class: 'pml-fat-cat' }, [el('summary', { text: parados.length + ' anúncio(s) sem venda nos últimos 30 dias' })]);
+        var t2 = el('table', { class: 'pml-table' });
+        parados.forEach(function (r) { t2.appendChild(linhaRep(r)); });
+        det.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
+        card.appendChild(det);
+      }
+      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
     } else {
       card.appendChild(el('p', { class: 'pml-note', text: 'Para ver quando cada produto acaba, cadastre abaixo a quantidade em estoque e o código do anúncio.' }));
     }

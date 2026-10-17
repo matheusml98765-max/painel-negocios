@@ -75,34 +75,42 @@
     return res;
   }
 
-  // Shopee Ads por anuncio, comparado com a margem do produto antes do Ads.
+  // Ads por anuncio (Shopee Ads e Product Ads do ML), comparado com a margem do produto antes do Ads.
   // decisao: 'aumentar' | 'manter' | 'pausar' | 'sem-custo' | 'pouco-dado'
-  function calcAdsPorProduto() {
-    var a = state.adsShopee;
-    if (!a || !a.por_item || !Object.keys(a.por_item).length) return null;
-    var dias = Number(a.por_item_dias) || 30;
-    var mapa = {};
-    calcLucroPorProduto(dias, 'shopee').linhas.forEach(function (g) { mapa[String(g.itemId)] = g; });
-    var linhas = Object.keys(a.por_item).map(function (id) {
-      var x = a.por_item[id];
-      var g = mapa[String(id)] || null;
-      var acos = x.vendas > 0 ? x.gasto / x.vendas : null;
-      var margem = g && g.margem !== null ? g.margem : null;
-      var decisao;
-      if (x.vendas === 0 && x.gasto < 15) decisao = 'pouco-dado';
-      else if (margem === null) decisao = 'sem-custo';
-      else if (acos === null || acos > margem) decisao = 'pausar';
-      else if (acos < margem * 0.5) decisao = 'aumentar';
-      else decisao = 'manter';
-      var nomeCamp = (x.campanhas || []).map(function (c) { return c.nome; }).filter(Boolean)[0];
-      return {
-        itemId: id, titulo: g ? g.titulo : (nomeCamp || 'Anúncio ' + id), gasto: x.gasto, vendasAds: x.vendas, pedidosAds: x.pedidos,
-        cliques: x.cliques, acos: acos, margem: margem, lucro: g ? g.lucro : null,
-        lucroDepois: g && g.lucro !== null ? g.lucro - x.gasto : null, decisao: decisao, campanhas: x.campanhas || []
-      };
+  function calcAdsPorProduto(plataforma) {
+    plataforma = plataforma || 'todas';
+    var fontes = [];
+    var sp = state.adsShopee, ml = state.anunciosMl && state.anunciosMl.ads;
+    if ((plataforma === 'todas' || plataforma === 'shopee') && sp && sp.por_item && Object.keys(sp.por_item).length) fontes.push({ plat: 'shopee', dias: Number(sp.por_item_dias) || 30, por_item: sp.por_item });
+    if ((plataforma === 'todas' || plataforma === 'ml') && ml && ml.por_item && Object.keys(ml.por_item).length) fontes.push({ plat: 'ml', dias: Number(ml.dias) || 30, por_item: ml.por_item });
+    if (!fontes.length) return null;
+    var linhas = [];
+    fontes.forEach(function (f) {
+      var mapa = {};
+      calcLucroPorProduto(f.dias, f.plat).linhas.forEach(function (g) { mapa[String(g.itemId).toUpperCase()] = g; });
+      var titulos = {};
+      ((state.anunciosMl && state.anunciosMl.itens) || []).forEach(function (it) { titulos[it.id] = it.titulo; });
+      Object.keys(f.por_item).forEach(function (id) {
+        var x = f.por_item[id];
+        var g = mapa[String(id).toUpperCase()] || null;
+        var acos = x.vendas > 0 ? x.gasto / x.vendas : null;
+        var margem = g && g.margem !== null ? g.margem : null;
+        var decisao;
+        if (x.vendas === 0 && x.gasto < 15) decisao = 'pouco-dado';
+        else if (margem === null) decisao = 'sem-custo';
+        else if (acos === null || acos > margem) decisao = 'pausar';
+        else if (acos < margem * 0.5) decisao = 'aumentar';
+        else decisao = 'manter';
+        var nomeCamp = (x.campanhas || []).map(function (c) { return c.nome; }).filter(Boolean)[0];
+        linhas.push({
+          itemId: id, plataforma: f.plat, titulo: g ? g.titulo : (titulos[id] || nomeCamp || 'Anúncio ' + id), gasto: x.gasto, vendasAds: x.vendas, pedidosAds: x.pedidos,
+          cliques: x.cliques, acos: acos, margem: margem, lucro: g ? g.lucro : null,
+          lucroDepois: g && g.lucro !== null ? g.lucro - x.gasto : null, decisao: decisao, campanhas: x.campanhas || [], nomeCampanha: nomeCamp || ''
+        });
+      });
     });
     linhas.sort(function (p, q) { return q.gasto - p.gasto; });
-    return { dias: dias, linhas: linhas };
+    return { dias: fontes[0].dias, linhas: linhas, plataformas: fontes.map(function (f) { return f.plat; }) };
   }
 
   // Unidades vendidas por anuncio nos ultimos N dias.
@@ -119,22 +127,34 @@
     return u;
   }
 
-  // Quanto tempo o estoque cadastrado aguenta e quanto comprar.
+  // Quanto tempo o estoque aguenta e quanto comprar.
+  // Usa o estoque real dos anuncios do ML (automacao) e, para o resto, a quantidade cadastrada na aba Estoque.
   // prazo = dias que o fornecedor leva para entregar; cobrir = dias de venda a garantir depois que chegar.
   function calcReposicao(prazo, cobrir) {
     prazo = prazo || 10; cobrir = cobrir || 30;
     var u = unidadesPorItem(30);
-    return state.produtos.filter(function (p) { return p.mlItemId; }).map(function (p) {
-      var id = String(p.mlItemId).trim().toUpperCase();
-      var qtd = Number(p.quantidade) || 0;
+    var lista = [], vistos = {};
+    function linha(nome, id, qtd, fonte, extra) {
       var porDia = (u[id] || 0) / 30;
       var cobertura = porDia > 0 ? qtd / porDia : null;
       var comprar = porDia > 0 ? Math.max(0, Math.ceil(porDia * (prazo + cobrir) - qtd)) : 0;
       var situacao = porDia === 0 ? 'parado' : (cobertura <= prazo ? 'urgente' : (cobertura <= prazo + 7 ? 'logo' : 'ok'));
       var fim = cobertura === null ? null : new Date(Date.now() + cobertura * 864e5);
-      return { produto: p, itemId: id, estoque: qtd, porDia: porDia, cobertura: cobertura, acabaEm: fim, comprar: comprar, situacao: situacao };
-    }).sort(function (a, b) {
-      return (a.cobertura === null ? 1e9 : a.cobertura) - (b.cobertura === null ? 1e9 : b.cobertura);
+      return Object.assign({ produto: { nome: nome }, itemId: id, estoque: qtd, porDia: porDia, cobertura: cobertura, acabaEm: fim, comprar: comprar, situacao: situacao, fonte: fonte }, extra || {});
+    }
+    ((state.anunciosMl && state.anunciosMl.itens) || []).forEach(function (it) {
+      if (it.status !== 'active' && !u[it.id]) return;
+      vistos[it.id] = true;
+      lista.push(linha(it.titulo, it.id, Number(it.estoque) || 0, 'ml', { full: !!it.full, pausado: it.status !== 'active' }));
+    });
+    state.produtos.filter(function (p) { return p.mlItemId; }).forEach(function (p) {
+      var id = String(p.mlItemId).trim().toUpperCase();
+      if (vistos[id]) return;
+      lista.push(linha(p.nome, id, Number(p.quantidade) || 0, 'manual'));
+    });
+    var ordem = { urgente: 0, logo: 1, ok: 2, parado: 3 };
+    return lista.sort(function (a, b) {
+      return ordem[a.situacao] - ordem[b.situacao] || (a.cobertura === null ? 1e9 : a.cobertura) - (b.cobertura === null ? 1e9 : b.cobertura);
     });
   }
 

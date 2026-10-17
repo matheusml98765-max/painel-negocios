@@ -94,3 +94,21 @@ test('aviso de automação parada usa o status.json, não a fatura', () => {
   p.state.statusAuto = null;
   perto(p.horasDesdeAtualizacaoAutomacao(), 0, 'fatura tem 6 h de folga');
 });
+
+test('reposição usa o estoque real dos anúncios do ML e Ads junta ML e Shopee', () => {
+  const p = painel();
+  p.state.transacoes = [vendaMl(dia(), 30)];
+  p.state.custosAvulsos = { MLB1: 50 }; // margem 30%
+  p.state.produtos = [{ id: 'a', nome: 'Manual', quantidade: 99, mlItemId: 'MLB1' }];
+  p.state.anunciosMl = { itens: [{ id: 'MLB1', titulo: 'Suporte', estoque: 5, status: 'active', full: true }, { id: 'MLB2', titulo: 'Parado', estoque: 3, status: 'active' }],
+    ads: { dias: 30, por_item: { MLB1: { gasto: 120, vendas: 1000, pedidos: 10, cliques: 50 } } } };
+  const rep = p.calcReposicao(10, 30);
+  assert.equal(rep.length, 2);
+  assert.equal(rep[0].estoque, 5); // vem da API, não do cadastro manual
+  assert.equal(rep[0].fonte, 'ml');
+  assert.equal(rep[1].situacao, 'parado');
+  const ads = p.calcAdsPorProduto('ml');
+  assert.equal(ads.linhas[0].plataforma, 'ml');
+  assert.equal(ads.linhas[0].aumentar, undefined);
+  assert.equal(ads.linhas[0].decisao, 'aumentar'); // ACOS 12% < metade de 30%
+});

@@ -18,8 +18,8 @@ Quem vende no Mercado Livre e na Shopee não sabe quanto lucra em cada produto. 
 - Tela de início com resumo do dia e do mês, gráficos e alertas; tema escuro e claro.
 - Meta do mês com projeção pelo ritmo de vendas, mapa de calor de vendas por dia da semana e hora, e backup dos custos para levar a outro navegador.
 - Ficha de cada produto (clique no nome na aba Lucro real): vendas e lucro por semana e simulador de desconto/campanha (quanto sobra e quanto precisa vender a mais).
-- Shopee Ads por produto com regra de decisão: Ads acima da margem → pausar; abaixo da metade → aumentar.
-- Reposição: até quando o estoque dura, quanto comprar e quando pedir filamento.
+- Ads por produto (Shopee Ads e Product Ads do ML) com regra de decisão: Ads acima da margem → pausar; abaixo da metade → aumentar.
+- Reposição com o estoque real dos anúncios do ML (Full incluso): até quando o estoque dura, quanto comprar e quando pedir filamento.
 - Relatório do mês: nota da loja (com o motivo de cada ponto perdido), problemas e oportunidades em R$, plano para 30 dias e PDF.
 - Avisos no Telegram (resumo às 8h, automação parada, venda grande), feitos pela automação.
 - Tudo atualizado sozinho de hora em hora.

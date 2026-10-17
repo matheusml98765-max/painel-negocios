@@ -32,6 +32,10 @@
       state.faturamento = fa ? JSON.parse(fa.value) : null;
     } catch (e) { state.faturamento = null; }
     try {
+      var an = await window.storage.get('ml-anuncios');
+      state.anunciosMl = an ? JSON.parse(an.value) : null;
+    } catch (e) { state.anunciosMl = null; }
+    try {
       var ads = await window.storage.get('ml-ads-shopee');
       state.adsShopee = ads ? JSON.parse(ads.value) : null;
     } catch (e) { state.adsShopee = null; }
@@ -101,6 +105,20 @@
     } catch (e) {}
   }
 
+  // Estoque e Product Ads dos anuncios do ML (anuncios_ml.json da automacao)
+  async function sincronizarAnunciosMl() {
+    if (!state.gistUrl) return;
+    try {
+      var r = await fetch(urlArquivoIrmao(state.gistUrl, 'anuncios_ml.json') + '?_=' + Date.now());
+      if (!r.ok) return;
+      var dados = await r.json();
+      if (dados && Array.isArray(dados.itens)) {
+        state.anunciosMl = dados;
+        try { await window.storage.set('ml-anuncios', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
   async function sincronizarAdsShopee() {
     if (!state.gistUrlShopee) return;
     try {
@@ -145,6 +163,7 @@
         await saveTransacoes();
       }
       await sincronizarFaturamento();
+      await sincronizarAnunciosMl();
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
       state.errorMsg = '';
