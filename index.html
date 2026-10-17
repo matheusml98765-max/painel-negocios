@@ -108,7 +108,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita' }, fatPeriodo: '' };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita' }, fatPeriodo: '', calc3d: null };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -202,6 +202,10 @@
       var ca = await window.storage.get('ml-custos-avulsos');
       state.custosAvulsos = ca ? JSON.parse(ca.value) : {};
     } catch (e) { state.custosAvulsos = {}; }
+    try {
+      var c3 = await window.storage.get('ml-calc3d');
+      if (c3) { var base3 = calc3dPadrao(); var salvo3 = JSON.parse(c3.value); Object.keys(salvo3).forEach(function (k) { base3[k] = salvo3[k]; }); state.calc3d = base3; }
+    } catch (e) {}
     try {
       var cl = await window.storage.get('ml-config-lucro');
       if (cl) { var cfg = JSON.parse(cl.value); Object.keys(cfg).forEach(function (k) { state.configLucro[k] = cfg[k]; }); }
@@ -457,7 +461,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['geral', 'Visão geral'], ['lucro', 'Lucro real'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
+    [['geral', 'Visão geral'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],
@@ -1083,6 +1087,258 @@
     wrap.appendChild(riscoCard);
   }
 
+  // ===================== CALCULADORA 3D =====================
+
+  function calc3dPadrao() {
+    return {
+      kwh: 0.95,              // R$ por kWh da conta de luz
+      perdaPct: 8,            // % de pecas perdidas/falhas
+      manutencaoHora: 0.30,   // R$ por hora de impressao (bico, mesa, correia...)
+      impressoras: [{ id: 'imp1', nome: 'Minha impressora', watts: 150, preco: 2500, vidaHoras: 5000 }],
+      filamentos: [],         // lotes: {id, data, tipo, descricao, kg, preco, frete}
+      embalagens: [],         // lotes: {id, data, nome, qtd, preco, frete}
+      produtos: [],           // {id, nome, tipo, gramas, horas, porPlaca, impressoraId, embalagem, extras, anuncios}
+      simulador: { comissao: 20, taxaFixa: 4, frete: 0, imposto: 4 }
+    };
+  }
+
+  function getCalc3d() {
+    if (!state.calc3d) state.calc3d = calc3dPadrao();
+    return state.calc3d;
+  }
+
+  async function salvarCalc3d() {
+    try { await window.storage.set('ml-calc3d', JSON.stringify(state.calc3d)); } catch (e) {}
+  }
+
+  function num(v) { var n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; }
+
+  // Custo por grama de um tipo de filamento: media ponderada de todos os lotes daquele tipo
+  // (soma do que voce pagou, com frete) / (soma dos gramas que chegaram).
+  function custoGrama(tipo) {
+    var c = getCalc3d();
+    var lotes = c.filamentos.filter(function (l) { return (l.tipo || '').toUpperCase() === (tipo || '').toUpperCase(); });
+    if (!lotes.length) lotes = c.filamentos;
+    var gramas = lotes.reduce(function (s, l) { return s + num(l.kg) * 1000; }, 0);
+    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
+    return gramas > 0 ? pago / gramas : 0;
+  }
+
+  function custoEmbalagem(nome) {
+    var c = getCalc3d();
+    var lotes = c.embalagens.filter(function (l) { return l.nome === nome; });
+    var qtd = lotes.reduce(function (s, l) { return s + num(l.qtd); }, 0);
+    var pago = lotes.reduce(function (s, l) { return s + num(l.preco) + num(l.frete); }, 0);
+    return qtd > 0 ? pago / qtd : 0;
+  }
+
+  function tiposFilamento() {
+    var t = {};
+    getCalc3d().filamentos.forEach(function (l) { if (l.tipo) t[l.tipo.toUpperCase()] = true; });
+    var lista = Object.keys(t);
+    return lista.length ? lista : ['PLA'];
+  }
+
+  function nomesEmbalagem() {
+    var t = {};
+    getCalc3d().embalagens.forEach(function (l) { if (l.nome) t[l.nome] = true; });
+    return Object.keys(t);
+  }
+
+  function custoPeca3d(p) {
+    var c = getCalc3d();
+    var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
+    var porPlaca = Math.max(1, num(p.porPlaca) || 1);
+    var horas = num(p.horas);
+    var material = num(p.gramas) * custoGrama(p.tipo);
+    var energia = horas * (num(imp.watts) / 1000) * num(c.kwh);
+    var desgaste = horas * (num(imp.vidaHoras) > 0 ? num(imp.preco) / num(imp.vidaHoras) : 0);
+    var manutencao = horas * num(c.manutencaoHora);
+    var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
+    var perda = porPeca * num(c.perdaPct) / 100;
+    var emb = p.embalagem ? custoEmbalagem(p.embalagem) : 0;
+    var extras = num(p.extras);
+    return {
+      material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
+      manutencao: manutencao / porPlaca, perda: perda, embalagem: emb, extras: extras,
+      total: porPeca + perda + emb + extras
+    };
+  }
+
+  // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro real)
+  function custo3dDoAnuncio(itemId) {
+    var id = String(itemId || '').trim().toUpperCase();
+    if (!id || !state.calc3d) return null;
+    var p = state.calc3d.produtos.find(function (x) {
+      return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
+    });
+    return p ? custoPeca3d(p).total : null;
+  }
+
+  function renderCalc3dTab(wrap) {
+    var c = getCalc3d();
+    function salvarERender() { salvarCalc3d(); render(); }
+    function campo(label, input, dica) {
+      return el('div', { class: 'pml-field' }, [el('label', { text: label }), input, dica ? el('div', { class: 'pml-margin', style: 'margin-top:3px;', text: dica }) : null]);
+    }
+    function inputNum(obj, chave, passo, aoMudar) {
+      var i = el('input', { type: 'number', step: passo || '0.01', value: obj[chave] === undefined ? '' : obj[chave] });
+      i.addEventListener('change', function () { obj[chave] = i.value === '' ? '' : num(i.value); (aoMudar || salvarERender)(); });
+      return i;
+    }
+    function inputTxt(obj, chave, ph) {
+      var i = el('input', { value: obj[chave] || '', placeholder: ph || '' });
+      i.addEventListener('change', function () { obj[chave] = i.value.trim(); salvarERender(); });
+      return i;
+    }
+    function hoje() { return new Date().toISOString().slice(0, 10); }
+
+    wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: 'Calculadora própria da sua impressão 3D. Cadastre cada <b>remessa</b> de filamento e embalagem com o preço que você pagou — o custo por grama é a média de todas as remessas, então quando o preço muda, o custo das peças acompanha sozinho. As peças ligadas a um anúncio do ML entram direto na aba <b>Lucro real</b>.' }));
+
+    // ---------- Custos gerais ----------
+    var g = el('div', { class: 'pml-card' });
+    g.appendChild(el('p', { class: 'pml-section-title', text: '1. Custos gerais' }));
+    g.appendChild(el('div', { class: 'pml-form-grid' }, [
+      campo('Luz (R$ por kWh)', inputNum(c, 'kwh', '0.01'), 'Valor na sua conta de luz'),
+      campo('Perdas e falhas (%)', inputNum(c, 'perdaPct', '1'), 'Peças que dão errado'),
+      campo('Manutenção (R$ por hora)', inputNum(c, 'manutencaoHora', '0.05'), 'Bico, mesa, correias...')
+    ]));
+    g.appendChild(el('p', { style: 'font-size:13px; font-weight:700; margin:14px 0 8px;', text: 'Impressoras' }));
+    c.impressoras.forEach(function (imp) {
+      var linha = el('div', { class: 'pml-form-grid', style: 'align-items:end;' }, [
+        campo('Nome', inputTxt(imp, 'nome')),
+        campo('Consumo (watts)', inputNum(imp, 'watts', '1'), 'Média durante a impressão'),
+        campo('Quanto pagou (R$)', inputNum(imp, 'preco', '1')),
+        campo('Vida útil (horas)', inputNum(imp, 'vidaHoras', '100'), 'Para dividir o desgaste'),
+        c.impressoras.length > 1 ? el('div', {}, [el('button', { class: 'pml-btn secondary', text: 'Remover', onclick: function () { c.impressoras = c.impressoras.filter(function (x) { return x !== imp; }); salvarERender(); } })]) : null
+      ]);
+      g.appendChild(linha);
+    });
+    g.appendChild(el('button', { class: 'pml-btn secondary', style: 'color:#2F6E52;', text: '+ Adicionar impressora', onclick: function () { c.impressoras.push({ id: uid(), nome: 'Impressora ' + (c.impressoras.length + 1), watts: 150, preco: 0, vidaHoras: 5000 }); salvarERender(); } }));
+    wrap.appendChild(g);
+
+    // ---------- Remessas de filamento ----------
+    function cardLotes(titulo, lista, colunas, novoLote, resumo) {
+      var card = el('div', { class: 'pml-card' });
+      card.appendChild(el('p', { class: 'pml-section-title', text: titulo }));
+      if (resumo) card.appendChild(resumo);
+      var t = el('table', { class: 'pml-table' });
+      t.appendChild(el('tr', {}, colunas.map(function (col) { return el('th', { class: col.num ? 'num' : '', text: col.titulo }); }).concat([el('th', { text: '' })])));
+      lista.slice().reverse().forEach(function (l) {
+        t.appendChild(el('tr', {}, colunas.map(function (col) {
+          var inp = col.num ? inputNum(l, col.chave, col.passo) : (col.chave === 'data' ? (function () { var d = el('input', { type: 'date', value: l.data || '' }); d.addEventListener('change', function () { l.data = d.value; salvarERender(); }); return d; })() : inputTxt(l, col.chave, col.ph));
+          inp.setAttribute('style', 'width:100%; min-width:' + (col.largura || 70) + 'px; padding:5px 7px; border:1px solid #E4DDCF; border-radius:6px; font-size:13px; background:#FFFDF9; font-family:inherit;');
+          return el('td', {}, [inp]);
+        }).concat([el('td', {}, [el('button', { class: 'pml-btn secondary', text: '✕', title: 'Remover', onclick: function () { lista.splice(lista.indexOf(l), 1); salvarERender(); } })])])));
+      });
+      if (!lista.length) t.appendChild(el('tr', {}, [el('td', { colspan: String(colunas.length + 1), class: 'pml-margin', text: 'Nenhuma remessa cadastrada ainda.' })]));
+      card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+      card.appendChild(el('button', { class: 'pml-btn', style: 'margin-top:12px; padding:7px 14px; font-size:13px;', text: '+ Nova remessa', onclick: function () { lista.push(novoLote()); salvarERender(); } }));
+      return card;
+    }
+
+    var resumoFil = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;' }, tiposFilamento().map(function (t) {
+      return el('span', { class: 'pml-badge venda', style: 'font-size:12px;', text: t + ': ' + fmtMoney(custoGrama(t) * 1000) + '/kg · ' + fmtMoney(custoGrama(t)).replace('R$', 'R$') + '/g' });
+    }));
+    wrap.appendChild(cardLotes('2. Remessas de filamento', c.filamentos, [
+      { titulo: 'Data', chave: 'data', largura: 130 },
+      { titulo: 'Tipo', chave: 'tipo', ph: 'PLA, PETG...', largura: 70 },
+      { titulo: 'Descrição', chave: 'descricao', ph: 'Marca / cor', largura: 140 },
+      { titulo: 'Kg', chave: 'kg', num: true, passo: '0.1' },
+      { titulo: 'Preço pago (R$)', chave: 'preco', num: true },
+      { titulo: 'Frete (R$)', chave: 'frete', num: true }
+    ], function () { return { id: uid(), data: hoje(), tipo: 'PLA', descricao: '', kg: 1, preco: '', frete: 0 }; }, resumoFil));
+
+    var resumoEmb = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;' }, nomesEmbalagem().map(function (n) {
+      return el('span', { class: 'pml-badge compra', style: 'font-size:12px;', text: n + ': ' + fmtMoney(custoEmbalagem(n)) + ' cada' });
+    }));
+    wrap.appendChild(cardLotes('3. Remessas de embalagem', c.embalagens, [
+      { titulo: 'Data', chave: 'data', largura: 130 },
+      { titulo: 'Embalagem', chave: 'nome', ph: 'Ex: Envelope P', largura: 140 },
+      { titulo: 'Quantidade', chave: 'qtd', num: true, passo: '1' },
+      { titulo: 'Preço pago (R$)', chave: 'preco', num: true },
+      { titulo: 'Frete (R$)', chave: 'frete', num: true }
+    ], function () { return { id: uid(), data: hoje(), nome: '', qtd: 100, preco: '', frete: 0 }; }, resumoEmb));
+
+    // ---------- Pecas ----------
+    var pc = el('div', { class: 'pml-card' });
+    pc.appendChild(el('p', { class: 'pml-section-title', text: '4. Suas peças — custo de cada uma' }));
+    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB dos anúncios dessa peça para o lucro aparecer na aba Lucro real.' }));
+    c.produtos.forEach(function (p) {
+      var custo = custoPeca3d(p);
+      var selTipo = el('select', {}, tiposFilamento().map(function (t) { var o = el('option', { value: t, text: t }); if ((p.tipo || '').toUpperCase() === t) o.setAttribute('selected', ''); return o; }));
+      selTipo.addEventListener('change', function () { p.tipo = selTipo.value; salvarERender(); });
+      var selImp = el('select', {}, c.impressoras.map(function (i) { var o = el('option', { value: i.id, text: i.nome }); if (p.impressoraId === i.id) o.setAttribute('selected', ''); return o; }));
+      selImp.addEventListener('change', function () { p.impressoraId = selImp.value; salvarERender(); });
+      var selEmb = el('select', {}, [el('option', { value: '', text: 'Sem embalagem' })].concat(nomesEmbalagem().map(function (n) { var o = el('option', { value: n, text: n }); if (p.embalagem === n) o.setAttribute('selected', ''); return o; })));
+      selEmb.addEventListener('change', function () { p.embalagem = selEmb.value; salvarERender(); });
+
+      var bloco = el('div', { style: 'border:1px solid #E4DDCF; border-radius:10px; padding:14px; margin-bottom:12px; background:#FFFDF9;' });
+      bloco.appendChild(el('div', { style: 'display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap; margin-bottom:10px;' }, [
+        el('div', { style: 'flex:1; min-width:200px;' }, [campo('Peça', inputTxt(p, 'nome', 'Ex: Suporte papel higiênico'))]),
+        el('div', { style: 'text-align:right;' }, [
+          el('div', { class: 'pml-metric-label', text: 'Custo por peça' }),
+          el('div', { class: 'pml-metric-value', style: 'color:#A15D1B;', text: fmtMoney(custo.total) })
+        ])
+      ]));
+      bloco.appendChild(el('div', { class: 'pml-form-grid' }, [
+        campo('Filamento', selTipo),
+        campo('Gramas (por impressão)', inputNum(p, 'gramas', '1')),
+        campo('Horas (por impressão)', inputNum(p, 'horas', '0.1')),
+        campo('Peças por impressão', inputNum(p, 'porPlaca', '1')),
+        campo('Impressora', selImp),
+        campo('Embalagem', selEmb),
+        campo('Extras por peça (R$)', inputNum(p, 'extras', '0.01'), 'Parafuso, fita, etiqueta...'),
+        campo('Anúncios (MLB...)', inputTxt(p, 'anuncios', 'MLB123, MLB456'))
+      ]));
+      var partes = [['Filamento', custo.material], ['Luz', custo.energia], ['Desgaste', custo.desgaste], ['Manutenção', custo.manutencao], ['Perdas', custo.perda], ['Embalagem', custo.embalagem], ['Extras', custo.extras]];
+      bloco.appendChild(el('div', { class: 'pml-margin', style: 'margin-top:4px; line-height:1.8;' }, partes.map(function (x) {
+        return el('span', { style: 'margin-right:14px; white-space:nowrap;', text: x[0] + ': ' + fmtMoney(x[1]) });
+      })));
+      bloco.appendChild(el('button', { class: 'pml-btn secondary', style: 'margin-top:8px;', text: 'Remover peça', onclick: function () { c.produtos = c.produtos.filter(function (x) { return x !== p; }); salvarERender(); } }));
+      pc.appendChild(bloco);
+    });
+    pc.appendChild(el('button', { class: 'pml-btn', text: '+ Nova peça', onclick: function () { c.produtos.push({ id: uid(), nome: '', tipo: tiposFilamento()[0], gramas: '', horas: '', porPlaca: 1, impressoraId: (c.impressoras[0] || {}).id, embalagem: nomesEmbalagem()[0] || '', extras: 0, anuncios: '' }); salvarERender(); } }));
+    wrap.appendChild(pc);
+
+    // ---------- Simulador de preco ----------
+    if (c.produtos.length) {
+      var s = c.simulador;
+      var sim = el('div', { class: 'pml-card' });
+      sim.appendChild(el('p', { class: 'pml-section-title', text: '5. Simulador de preço de venda' }));
+      sim.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 12px;', text: 'Coloque as taxas da plataforma (confira os valores atuais na Shopee/ML). O simulador mostra o preço para cada margem e o lucro no preço que você digitar.' }));
+      sim.appendChild(el('div', { class: 'pml-form-grid' }, [
+        campo('Comissão da plataforma (%)', inputNum(s, 'comissao', '0.5')),
+        campo('Taxa fixa por venda (R$)', inputNum(s, 'taxaFixa', '0.5')),
+        campo('Frete que você paga (R$)', inputNum(s, 'frete', '0.5')),
+        campo('Imposto (%)', inputNum(s, 'imposto', '0.5'))
+      ]));
+      var t = el('table', { class: 'pml-table' });
+      t.appendChild(el('tr', {}, ['Peça', 'Custo', 'Preço p/ 20%', 'Preço p/ 30%', 'Preço p/ 40%', 'Seu preço', 'Lucro', 'Margem'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
+      var taxasPct = (num(s.comissao) + num(s.imposto)) / 100;
+      function precoPara(custo, margem) { var d = 1 - taxasPct - margem; return d > 0 ? (custo + num(s.taxaFixa) + num(s.frete)) / d : null; }
+      c.produtos.forEach(function (p) {
+        var custo = custoPeca3d(p).total;
+        var precoInp = el('input', { class: 'pml-custo-input', type: 'number', step: '0.01', value: p.precoVenda || '', placeholder: 'R$' });
+        precoInp.addEventListener('change', function () { p.precoVenda = num(precoInp.value) || ''; salvarERender(); });
+        var pv = num(p.precoVenda);
+        var lucro = pv ? pv * (1 - taxasPct) - num(s.taxaFixa) - num(s.frete) - custo : null;
+        t.appendChild(el('tr', { class: lucro !== null && lucro < 0 ? 'pml-row-alerta' : '' }, [
+          el('td', { text: p.nome || '(sem nome)' }),
+          el('td', { class: 'num', text: fmtMoney(custo) }),
+          el('td', { class: 'num', text: precoPara(custo, 0.2) ? fmtMoney(precoPara(custo, 0.2)) : '—' }),
+          el('td', { class: 'num', text: precoPara(custo, 0.3) ? fmtMoney(precoPara(custo, 0.3)) : '—' }),
+          el('td', { class: 'num', text: precoPara(custo, 0.4) ? fmtMoney(precoPara(custo, 0.4)) : '—' }),
+          el('td', { class: 'num' }, [precoInp]),
+          el('td', { class: 'num', style: lucro !== null && lucro < 0 ? 'color:#B23A2E; font-weight:700;' : 'font-weight:600;', text: lucro === null ? '—' : fmtMoney(lucro) }),
+          el('td', { class: 'num', text: lucro === null ? '—' : fmtPct(lucro / pv) })
+        ]));
+      });
+      sim.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+      wrap.appendChild(sim);
+    }
+  }
+
   // ===================== LUCRO REAL =====================
 
   function horasDesdeAtualizacaoAutomacao() {
@@ -1099,6 +1355,8 @@
 
   function custoDoItem(itemId) {
     var id = String(itemId || '').trim().toUpperCase();
+    var c3d = custo3dDoAnuncio(id);
+    if (c3d !== null) return { valor: c3d, fonte: '3d' };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
     if (state.custosAvulsos[id] !== undefined && state.custosAvulsos[id] !== '') return { valor: Number(state.custosAvulsos[id]), fonte: 'avulso' };
@@ -1283,7 +1541,7 @@
         });
         celCusto = el('td', { class: 'num' }, [inp]);
       } else {
-        celCusto = el('td', { class: 'num', title: 'Custo vindo da aba Estoque', text: fmtMoney(g.custoUnit) });
+        celCusto = el('td', { class: 'num', title: g.fonteCusto === '3d' ? 'Custo calculado na Calculadora 3D' : 'Custo vindo da aba Estoque', text: fmtMoney(g.custoUnit) + (g.fonteCusto === '3d' ? ' · 3D' : '') });
       }
 
       table.appendChild(el('tr', { class: classe }, [
@@ -1378,7 +1636,7 @@
 
   function render() {
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' ? ' largo' : '') });
     renderHeader(wrap);
     renderTabs(wrap);
     if (!state.loaded) {
@@ -1408,6 +1666,8 @@
       renderEstoqueTab(wrap);
     } else if (state.tab === 'lucro') {
       renderLucroTab(wrap);
+    } else if (state.tab === 'calc3d') {
+      renderCalc3dTab(wrap);
     } else if (state.tab === 'financeiro') {
       renderFinanceiroTab(wrap);
     } else {
