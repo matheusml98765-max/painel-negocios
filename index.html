@@ -65,6 +65,29 @@
   .pml-import-summary { background: #F1ECE2; border-radius: 10px; padding: 14px 16px; margin-top: 14px; font-size: 13px; line-height: 1.7; }
   .pml-import-summary b { color: #1B2016; }
   .pml-note { font-size: 12px; color: #6B6558; margin-top: 8px; line-height: 1.6; }
+  .pml-tabs { flex-wrap: wrap; max-width: 100%; }
+  .pml-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+  .pml-table td.num, .pml-table th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pml-tabela-lucro { min-width: 860px; }
+  .pml-tabela-lucro td:first-child { min-width: 240px; max-width: 300px; }
+  .pml-titulo-prod { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+  .pml-row-alerta td { background: #FDF3F1; }
+  .pml-row-atencao td { background: #FFF8EC; }
+  .pml-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; margin-left: 6px; vertical-align: 1px; }
+  .pml-tag.prejuizo { background: #FBEAE7; color: #B23A2E; }
+  .pml-tag.baixa { background: #FCEFE2; color: #A15D1B; }
+  .pml-tag.boa { background: #E1F0E7; color: #2F6E52; }
+  .pml-custo-input { width: 84px; padding: 4px 6px; border: 1px dashed #C97A2B; border-radius: 6px; font-size: 12px; background: #FFFDF9; font-family: inherit; }
+  .pml-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+  .pml-filtros .pml-field { flex: 1 1 150px; max-width: 220px; }
+  .pml-wrap.largo { max-width: 1200px; }
+  .pml-barra { height: 8px; border-radius: 999px; background: #F1ECE2; overflow: hidden; margin-top: 6px; }
+  .pml-barra span { display: block; height: 100%; background: #C97A2B; }
+  .pml-fat-cat { border-top: 1px solid #F1ECE2; padding: 10px 0; }
+  .pml-fat-cat summary { cursor: pointer; display: flex; justify-content: space-between; gap: 12px; font-size: 14px; list-style: none; }
+  .pml-fat-cat summary::-webkit-details-marker { display: none; }
+  .pml-fat-linha { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: #6B6558; padding: 4px 0 0 14px; }
+  .pml-dica { background: #FFF8EC; border: 1px solid #F3E1C2; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6; color: #5C4A2E; margin-top: 12px; }
 </style>
 
 <script>
@@ -85,7 +108,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [] };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita' }, fatPeriodo: '' };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -171,6 +194,18 @@
       var us = await window.storage.get('ml-ultima-sync-shopee');
       state.ultimaSincronizacaoShopee = us ? us.value : '';
     } catch (e) { state.ultimaSincronizacaoShopee = ''; }
+    try {
+      var fa = await window.storage.get('ml-faturamento');
+      state.faturamento = fa ? JSON.parse(fa.value) : null;
+    } catch (e) { state.faturamento = null; }
+    try {
+      var ca = await window.storage.get('ml-custos-avulsos');
+      state.custosAvulsos = ca ? JSON.parse(ca.value) : {};
+    } catch (e) { state.custosAvulsos = {}; }
+    try {
+      var cl = await window.storage.get('ml-config-lucro');
+      if (cl) { var cfg = JSON.parse(cl.value); Object.keys(cfg).forEach(function (k) { state.configLucro[k] = cfg[k]; }); }
+    } catch (e) {}
     state.loaded = true;
     render();
     if (state.gistUrl) { sincronizarGist(true); }
@@ -187,12 +222,45 @@
     try { await window.storage.set('ml-gist-url-shopee', url); } catch (e) {}
   }
 
+  // O link "raw" do Gist pode vir preso a uma versao antiga (/raw/<codigo>/arquivo).
+  // Tirando esse codigo, o painel sempre busca a versao mais recente.
+  function urlGistAtual(url) {
+    return String(url || '').replace(/\/raw\/[0-9a-f]{40}\//, '/raw/');
+  }
+
+  function urlArquivoIrmao(url, nomeArquivo) {
+    var base = urlGistAtual(url).split('?')[0];
+    return base.replace(/[^\/]+$/, nomeArquivo);
+  }
+
+  async function sincronizarFaturamento() {
+    if (!state.gistUrl) return;
+    try {
+      var r = await fetch(urlArquivoIrmao(state.gistUrl, 'faturamento.json') + '?_=' + Date.now());
+      if (!r.ok) return;
+      var dados = await r.json();
+      if (dados && Array.isArray(dados.periodos)) {
+        state.faturamento = dados;
+        try { await window.storage.set('ml-faturamento', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  async function salvarCustosAvulsos() {
+    try { await window.storage.set('ml-custos-avulsos', JSON.stringify(state.custosAvulsos)); } catch (e) {}
+  }
+
+  async function salvarConfigLucro() {
+    try { await window.storage.set('ml-config-lucro', JSON.stringify(state.configLucro)); } catch (e) {}
+  }
+
   async function sincronizarGist(silencioso) {
     if (!state.gistUrl) return;
     state.sincronizando = true;
     if (!silencioso) render();
     try {
-      var resposta = await fetch(state.gistUrl + (state.gistUrl.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
+      var urlAtual = urlGistAtual(state.gistUrl);
+      var resposta = await fetch(urlAtual + (urlAtual.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
       var texto = await resposta.text();
       var resultado = parseApiJson(texto, 'api-ml-', 'Mercado Livre');
       if (!resultado.erro && resultado.novas.length > 0) {
@@ -208,6 +276,7 @@
       } else if (!resultado.erro && resultado.atualizadas > 0) {
         await saveTransacoes();
       }
+      await sincronizarFaturamento();
       state.ultimaSincronizacao = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync', state.ultimaSincronizacao); } catch (e) {}
       state.errorMsg = '';
@@ -223,7 +292,8 @@
     state.sincronizandoShopee = true;
     if (!silencioso) render();
     try {
-      var resposta = await fetch(state.gistUrlShopee + (state.gistUrlShopee.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
+      var urlAtualShopee = urlGistAtual(state.gistUrlShopee);
+      var resposta = await fetch(urlAtualShopee + (urlAtualShopee.indexOf('?') === -1 ? '?_=' : '&_=') + Date.now());
       var texto = await resposta.text();
       var resultado = parseApiJson(texto, 'api-shopee-', 'Shopee');
       if (!resultado.erro && resultado.novas.length > 0) {
@@ -387,7 +457,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['geral', 'Visão geral'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
+    [['geral', 'Visão geral'], ['lucro', 'Lucro real'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],
@@ -785,12 +855,16 @@
       var origemId = origemPrefix + item.id + '-' + tipo;
       var existente = state.transacoes.find(function (t) { return t.origemId === origemId; });
       if (existente) {
-        if (tipo === 'venda' && Array.isArray(item.itens) && !Array.isArray(existente.itens)) {
+        var mudou = false;
+        if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || (item.custos_ml && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
           existente.itens = item.itens;
-          atualizadas++;
-        } else {
-          ignoradas++;
+          mudou = true;
         }
+        if (tipo === 'venda' && item.custos_ml && JSON.stringify(existente.custosMl || null) !== JSON.stringify(item.custos_ml)) {
+          existente.custosMl = item.custos_ml;
+          mudou = true;
+        }
+        if (mudou) atualizadas++; else ignoradas++;
         return;
       }
       var transacaoNova = {
@@ -800,6 +874,9 @@
       };
       if (tipo === 'venda' && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
+      }
+      if (tipo === 'venda' && item.custos_ml) {
+        transacaoNova.custosMl = item.custos_ml;
       }
       novas.push(transacaoNova);
     });
@@ -1006,9 +1083,302 @@
     wrap.appendChild(riscoCard);
   }
 
+  // ===================== LUCRO REAL =====================
+
+  function horasDesdeAtualizacaoAutomacao() {
+    if (!state.faturamento || !state.faturamento.atualizado_em) return null;
+    var t = new Date(state.faturamento.atualizado_em).getTime();
+    if (isNaN(t)) return null;
+    return (Date.now() - t) / 36e5;
+  }
+
+  function fmtPct(n) {
+    if (n === null || n === undefined || !isFinite(n)) return '—';
+    return (n * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  }
+
+  function custoDoItem(itemId) {
+    var id = String(itemId || '').trim().toUpperCase();
+    var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
+    if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
+    if (state.custosAvulsos[id] !== undefined && state.custosAvulsos[id] !== '') return { valor: Number(state.custosAvulsos[id]), fonte: 'avulso' };
+    return null;
+  }
+
+  // Junta as vendas dos ultimos N dias por anuncio e calcula o lucro real de cada um.
+  function calcLucroPorProduto(dias) {
+    var limite = new Date();
+    limite.setHours(0, 0, 0, 0);
+    limite.setDate(limite.getDate() - dias + 1);
+    var limiteStr = limite.toISOString().slice(0, 10);
+    var imposto = (Number(state.configLucro.imposto) || 0) / 100;
+    var alvo = (Number(state.configLucro.margemAlvo) || 0) / 100;
+    var grupos = {};
+    var semDados = 0;
+
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !t.custosMl || !Array.isArray(t.itens) || t.data < limiteStr) {
+        if (t.tipo === 'venda' && !t.custosMl && t.data >= limiteStr && (t.origemId || '').indexOf('api-ml-') === 0) semDados++;
+        return;
+      }
+      var valor = Number(t.valor) || 0;
+      var c = t.custosMl;
+      var liquidoPedido = (c.liquido_recebido !== null && c.liquido_recebido !== undefined)
+        ? Number(c.liquido_recebido)
+        : valor - (Number(c.comissao) || 0) - (Number(c.frete) || 0);
+      var brutoItens = t.itens.reduce(function (s, i) { return s + (Number(i.preco_unitario) || 0) * (Number(i.quantidade) || 1); }, 0);
+      t.itens.forEach(function (i) {
+        var qtd = Number(i.quantidade) || 1;
+        var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
+        var id = String(i.item_id || 'sem-id');
+        var g = grupos[id] || (grupos[id] = { itemId: id, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0 });
+        g.unidades += qtd;
+        g.vendas += 1;
+        g.receita += valor * parte;
+        g.comissao += Number(i.comissao) || 0;
+        g.frete += (Number(c.frete) || 0) * parte;
+        g.liquido += liquidoPedido * parte;
+      });
+    });
+
+    var linhas = Object.keys(grupos).map(function (k) {
+      var g = grupos[k];
+      var custo = custoDoItem(g.itemId);
+      g.custoUnit = custo ? custo.valor : null;
+      g.fonteCusto = custo ? custo.fonte : null;
+      g.imposto = g.receita * imposto;
+      g.taxasMl = g.receita - g.liquido;
+      g.precoMedio = g.unidades ? g.receita / g.unidades : 0;
+      if (g.custoUnit !== null) {
+        g.custoTotal = g.custoUnit * g.unidades;
+        g.lucro = g.liquido - g.imposto - g.custoTotal;
+        g.lucroUnit = g.unidades ? g.lucro / g.unidades : 0;
+        g.margem = g.receita ? g.lucro / g.receita : null;
+        g.roi = g.custoTotal ? g.lucro / g.custoTotal : null;
+      } else {
+        g.custoTotal = null; g.lucro = null; g.lucroUnit = null; g.margem = null; g.roi = null;
+      }
+      g.maxCompra = g.unidades ? (g.liquido - g.imposto) / g.unidades - alvo * g.precoMedio : null;
+      return g;
+    });
+    return { linhas: linhas, semDados: semDados };
+  }
+
+  function exportarLucroExcel(linhas, dias) {
+    if (typeof XLSX === 'undefined') { alertaSimples('Não consegui carregar o gerador de Excel. Confira sua internet.'); return; }
+    var rows = linhas.map(function (g) {
+      return {
+        'Anúncio': g.itemId, 'Produto': g.titulo, 'Tipo': g.tipoAnuncio,
+        'Unidades': g.unidades, 'Preço médio': round2(g.precoMedio), 'Faturamento': round2(g.receita),
+        'Comissão ML': round2(g.comissao), 'Frete pago': round2(g.frete), 'Recebido líquido': round2(g.liquido),
+        'Imposto': round2(g.imposto), 'Custo unitário': g.custoUnit, 'Custo total': g.custoTotal === null ? null : round2(g.custoTotal),
+        'Lucro': g.lucro === null ? null : round2(g.lucro), 'Lucro por unidade': g.lucroUnit === null ? null : round2(g.lucroUnit),
+        'Margem %': g.margem === null ? null : round2(g.margem * 100), 'Preço máx. de compra': round2(g.maxCompra)
+      };
+    });
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lucro real ' + dias + 'd');
+    XLSX.writeFile(wb, 'lucro-real-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  }
+
+  function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+  function alertaSimples(msg) { state.errorMsg = msg; render(); }
+
+  function renderLucroTab(wrap) {
+    var cfg = state.configLucro;
+    var dias = Number(cfg.dias) || 30;
+    var calc = calcLucroPorProduto(dias);
+    var linhas = calc.linhas;
+
+    // ---- Filtros e premissas ----
+    var filtros = el('div', { class: 'pml-filtros' });
+    function campo(label, input) { return el('div', { class: 'pml-field' }, [el('label', { text: label }), input]); }
+    var selDias = el('select', { onchange: function () { cfg.dias = Number(selDias.value); salvarConfigLucro(); render(); } },
+      [7, 15, 30].map(function (d) { var o = el('option', { value: d, text: 'Últimos ' + d + ' dias' }); if (d === dias) o.setAttribute('selected', ''); return o; }));
+    var inpImp = el('input', { type: 'number', step: '0.1', value: cfg.imposto, onchange: function () { cfg.imposto = Number(inpImp.value) || 0; salvarConfigLucro(); render(); } });
+    var inpAlvo = el('input', { type: 'number', step: '1', value: cfg.margemAlvo, onchange: function () { cfg.margemAlvo = Number(inpAlvo.value) || 0; salvarConfigLucro(); render(); } });
+    var selOrdem = el('select', { onchange: function () { cfg.ordem = selOrdem.value; salvarConfigLucro(); render(); } },
+      [['receita', 'Mais vendidos (R$)'], ['lucro', 'Maior lucro'], ['margem', 'Menor margem primeiro'], ['semcusto', 'Sem custo primeiro']].map(function (o) {
+        var op = el('option', { value: o[0], text: o[1] }); if (o[0] === cfg.ordem) op.setAttribute('selected', ''); return op;
+      }));
+    filtros.appendChild(campo('Período', selDias));
+    filtros.appendChild(campo('Imposto (% da venda)', inpImp));
+    filtros.appendChild(campo('Margem que você quer (%)', inpAlvo));
+    filtros.appendChild(campo('Ordenar por', selOrdem));
+
+    if (linhas.length === 0) {
+      var vazio = el('div', { class: 'pml-card' });
+      vazio.appendChild(filtros);
+      vazio.appendChild(el('div', { class: 'pml-empty', html: 'Ainda não há vendas com os custos do Mercado Livre neste período.<br>Eles chegam sozinhos pela automação (comissão, frete e valor recebido de cada venda). Se a automação acabou de ser atualizada, abra o painel de novo daqui a pouco.' }));
+      wrap.appendChild(vazio);
+      renderFaturaCard(wrap);
+      return;
+    }
+
+    // ---- Resumo ----
+    var tot = linhas.reduce(function (a, g) {
+      a.receita += g.receita; a.liquido += g.liquido; a.unidades += g.unidades; a.imposto += g.imposto;
+      if (g.lucro !== null) { a.lucro += g.lucro; a.receitaComCusto += g.receita; } else { a.semCusto++; }
+      if (g.lucro !== null && g.lucro < 0) a.prejuizo++;
+      return a;
+    }, { receita: 0, liquido: 0, unidades: 0, imposto: 0, lucro: 0, receitaComCusto: 0, semCusto: 0, prejuizo: 0 });
+    var levou = tot.receita ? 1 - tot.liquido / tot.receita : 0;
+
+    var metr = el('div', { class: 'pml-metrics' }, [
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + dias + ' dias)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão e frete' })]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'O Mercado Livre ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ' · já sem imposto' })])
+    ]);
+    wrap.appendChild(metr);
+
+    // ---- Alertas ----
+    var alertas = [];
+    if (tot.prejuizo) alertas.push('🔴 <b>' + tot.prejuizo + ' produto(s) dando prejuízo</b> no período (linhas em vermelho na tabela).');
+    if (tot.semCusto) alertas.push('✏️ <b>' + tot.semCusto + ' produto(s) sem custo cadastrado.</b> Digite quanto você pagou direto na tabela (campo pontilhado) para ver o lucro deles.');
+    if (calc.semDados) alertas.push('ℹ️ ' + calc.semDados + ' venda(s) antigas ainda sem os custos do ML — elas não entram nesta conta.');
+    if (alertas.length) wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: alertas.join('<br>') }));
+
+    // ---- Tabela por produto ----
+    var ordem = cfg.ordem || 'receita';
+    linhas.sort(function (a, b) {
+      if (ordem === 'lucro') return (b.lucro === null ? -1e12 : b.lucro) - (a.lucro === null ? -1e12 : a.lucro);
+      if (ordem === 'margem') return (a.margem === null ? 1e12 : a.margem) - (b.margem === null ? 1e12 : b.margem);
+      if (ordem === 'semcusto') return (a.custoUnit === null ? 0 : 1) - (b.custoUnit === null ? 0 : 1) || b.receita - a.receita;
+      return b.receita - a.receita;
+    });
+
+    var card = el('div', { class: 'pml-card' });
+    var topo = el('div', { style: 'display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;' }, [
+      el('p', { class: 'pml-section-title', style: 'margin:0;', text: 'Lucro por produto' }),
+      el('button', { class: 'pml-btn', style: 'padding:7px 14px; font-size:13px;', text: '⬇ Exportar Excel', onclick: function () { exportarLucroExcel(linhas, dias); } })
+    ]);
+    card.appendChild(topo);
+    card.appendChild(filtros);
+
+    var table = el('table', { class: 'pml-table pml-tabela-lucro' });
+    table.appendChild(el('tr', {}, [
+      el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Un.' }), el('th', { class: 'num', text: 'Preço méd.' }),
+      el('th', { class: 'num', text: 'Taxas ML' }), el('th', { class: 'num', text: 'Recebido' }), el('th', { class: 'num', text: 'Custo un.' }),
+      el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Margem' }),
+      el('th', { class: 'num', text: 'Pagar até' })
+    ]));
+    linhas.forEach(function (g) {
+      var classe = '';
+      var tag = null;
+      if (g.lucro !== null && g.lucro < 0) { classe = 'pml-row-alerta'; tag = el('span', { class: 'pml-tag prejuizo', text: 'prejuízo' }); }
+      else if (g.margem !== null && g.margem < 0.1) { classe = 'pml-row-atencao'; tag = el('span', { class: 'pml-tag baixa', text: 'margem baixa' }); }
+      else if (g.margem !== null && g.margem >= (Number(cfg.margemAlvo) || 0) / 100) { tag = el('span', { class: 'pml-tag boa', text: 'ótimo' }); }
+
+      var celCusto;
+      if (g.custoUnit === null || g.fonteCusto === 'avulso') {
+        var inp = el('input', { class: 'pml-custo-input', type: 'number', step: '0.01', placeholder: 'R$ custo', value: g.custoUnit === null ? '' : g.custoUnit, title: 'Quanto você paga por unidade' });
+        inp.addEventListener('change', function () {
+          var v = inp.value.trim();
+          if (v === '') delete state.custosAvulsos[g.itemId.toUpperCase()];
+          else state.custosAvulsos[g.itemId.toUpperCase()] = Number(v.replace(',', '.'));
+          salvarCustosAvulsos();
+          render();
+        });
+        celCusto = el('td', { class: 'num' }, [inp]);
+      } else {
+        celCusto = el('td', { class: 'num', title: 'Custo vindo da aba Estoque', text: fmtMoney(g.custoUnit) });
+      }
+
+      table.appendChild(el('tr', { class: classe }, [
+        el('td', {}, [
+          el('div', { class: 'pml-titulo-prod', title: g.titulo, text: g.titulo }),
+          el('div', { class: 'pml-margin' }, [document.createTextNode(g.itemId + (g.tipoAnuncio ? ' · ' + g.tipoAnuncio : '')), tag])
+        ]),
+        el('td', { class: 'num', text: String(g.unidades) }),
+        el('td', { class: 'num', text: fmtMoney(g.precoMedio) }),
+        el('td', { class: 'num', title: 'Comissão ' + fmtMoney(g.comissao) + ' + frete ' + fmtMoney(g.frete), text: fmtMoney(g.taxasMl) + ' (' + fmtPct(g.receita ? g.taxasMl / g.receita : 0) + ')' }),
+        el('td', { class: 'num', text: fmtMoney(g.liquido) }),
+        celCusto,
+        el('td', { class: 'num', style: g.lucroUnit !== null && g.lucroUnit < 0 ? 'color:#B23A2E; font-weight:700;' : 'font-weight:600;', text: g.lucroUnit === null ? '—' : fmtMoney(g.lucroUnit) }),
+        el('td', { class: 'num', text: g.lucro === null ? '—' : fmtMoney(g.lucro) }),
+        el('td', { class: 'num', text: fmtPct(g.margem) }),
+        el('td', { class: 'num', title: 'Preço máximo de compra para ter ' + cfg.margemAlvo + '% de margem', text: g.maxCompra === null ? '—' : fmtMoney(Math.max(0, g.maxCompra)) })
+      ]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas ML</b> = comissão + frete que você pagou, de cada venda real (vem da API). <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    wrap.appendChild(card);
+
+    renderFaturaCard(wrap);
+  }
+
+  function renderFaturaCard(wrap) {
+    var fat = state.faturamento;
+    var card = el('div', { class: 'pml-card' });
+    card.appendChild(el('p', { class: 'pml-section-title', text: 'Fatura do Mercado Livre e Mercado Pago' }));
+    if (!fat || !Array.isArray(fat.periodos) || fat.periodos.length === 0) {
+      card.appendChild(el('div', { class: 'pml-empty', text: 'A fatura chega pela automação. Assim que ela rodar com a versão nova, aparece aqui tudo o que o ML cobrou no mês.' }));
+      wrap.appendChild(card);
+      return;
+    }
+    var periodos = fat.periodos.filter(function (p) { return (p.linhas || []).length > 0; });
+    if (!periodos.length) { card.appendChild(el('div', { class: 'pml-empty', text: 'Sem detalhes de fatura ainda.' })); wrap.appendChild(card); return; }
+    var padrao = periodos.find(function (p) { return p.situacao === 'fechada'; }) || periodos[0];
+    var atual = periodos.find(function (p) { return p.chave === state.fatPeriodo; }) || padrao;
+
+    function fmtData(d) { var x = String(d || '').split('-'); return x.length === 3 ? x[2] + '/' + x[1] : d; }
+    var sel = el('select', { onchange: function () { state.fatPeriodo = sel.value; render(); } }, periodos.map(function (p) {
+      var o = el('option', { value: p.chave, text: 'Fatura ' + p.chave.slice(0, 7) + ' (' + fmtData(p.de) + ' a ' + fmtData(p.ate) + ')' + (p.situacao === 'aberta' ? ' — em andamento' : '') });
+      if (p.chave === atual.chave) o.setAttribute('selected', '');
+      return o;
+    }));
+    card.appendChild(el('div', { class: 'pml-field', style: 'max-width:380px; margin-bottom:14px;' }, [sel]));
+
+    var cats = {};
+    var cobrado = 0, estornado = 0;
+    atual.linhas.forEach(function (l) {
+      var c = cats[l.categoria] || (cats[l.categoria] = { total: 0, linhas: [] });
+      c.total += l.valor; c.linhas.push(l);
+      if (l.valor >= 0) cobrado += l.valor; else estornado += l.valor;
+    });
+    var nomes = Object.keys(cats).sort(function (a, b) {
+      if (a === 'Estornos e bonificações') return 1;
+      if (b === 'Estornos e bonificações') return -1;
+      return cats[b].total - cats[a].total;
+    });
+    nomes.forEach(function (n) {
+      var c = cats[n];
+      var det = el('details', { class: 'pml-fat-cat' });
+      det.appendChild(el('summary', {}, [
+        el('span', { html: '<b>' + n + '</b> <span class="pml-margin">(' + c.linhas.length + ')</span>' }),
+        el('span', { style: 'font-weight:700; ' + (c.total < 0 ? 'color:#2F6E52;' : ''), text: fmtMoney(c.total) })
+      ]));
+      c.linhas.forEach(function (l) {
+        det.appendChild(el('div', { class: 'pml-fat-linha' }, [el('span', { text: l.descricao }), el('span', { text: fmtMoney(l.valor) })]));
+      });
+      card.appendChild(det);
+    });
+    card.appendChild(el('div', { class: 'pml-fat-cat', style: 'display:flex; justify-content:space-between; font-size:15px;' }, [
+      el('b', { text: 'Custo real do período' }), el('b', { text: fmtMoney(cobrado + estornado) })
+    ]));
+
+    var dicas = [];
+    if (cats['Antecipação'] && cats['Antecipação'].total > 0) {
+      dicas.push('💸 <b>Você pagou ' + fmtMoney(cats['Antecipação'].total) + ' para receber dinheiro antes do prazo.</b> Se não precisava do dinheiro na hora, vale desligar a antecipação automática no Mercado Pago e antecipar só quando precisar.');
+    }
+    if (cats['Parcelamento'] && cats['Parcelamento'].total > 0) {
+      dicas.push('💳 <b>' + fmtMoney(cats['Parcelamento'].total) + ' em taxas de parcelamento.</b> Vem dos anúncios Premium e de campanhas com parcelamento sem juros — confira se as vendas a mais compensam.');
+    }
+    if (cats['Publicidade'] && cats['Estornos e bonificações']) {
+      var pub = cats['Publicidade'].total;
+      var bonPub = cats['Estornos e bonificações'].linhas.filter(function (l) { return /publicidade|ads/i.test(l.descricao); }).reduce(function (s, l) { return s + l.valor; }, 0);
+      if (pub > 0 && bonPub < 0) dicas.push('📣 Dos ' + fmtMoney(pub) + ' de Product Ads, ' + fmtMoney(-bonPub) + ' foram bonificados pelo ML (crédito grátis).');
+    }
+    if (dicas.length) card.appendChild(el('div', { class: 'pml-dica', html: dicas.join('<br><br>') }));
+    if (fat.atualizado_em) card.appendChild(el('p', { class: 'pml-note', text: 'Atualizado em ' + new Date(fat.atualizado_em).toLocaleString('pt-BR') + '.' }));
+    wrap.appendChild(card);
+  }
+
   function render() {
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' ? ' largo' : '') });
     renderHeader(wrap);
     renderTabs(wrap);
     if (!state.loaded) {
@@ -1022,6 +1392,10 @@
     if (sincronizacaoAtrasada()) {
       wrap.appendChild(el('div', { class: 'pml-import-summary', style: 'border:1px solid #F0D8D2; color:#B23A2E; margin-bottom:16px;', text: '⚠ A sincronização automática não roda há mais de 2 dias. Confere se a automação no GitHub Actions ainda está rodando, ou sincronize manualmente na aba Importar.' }));
     }
+    var horasSemAtualizar = horasDesdeAtualizacaoAutomacao();
+    if (horasSemAtualizar !== null && horasSemAtualizar > 6) {
+      wrap.appendChild(el('div', { class: 'pml-import-summary', style: 'border:1px solid #F0D8D2; color:#B23A2E; margin-bottom:16px;', text: '⚠ A automação do Mercado Livre não manda dados novos há ' + Math.round(horasSemAtualizar) + ' horas. As vendas mais recentes podem não estar aparecendo. Verifique a automação no GitHub (aba Actions).' }));
+    }
     renderMetrics(wrap);
     if (state.tab === 'geral') {
       renderGraficoVendas(wrap);
@@ -1032,6 +1406,8 @@
       wrap.appendChild(infoCard);
     } else if (state.tab === 'estoque') {
       renderEstoqueTab(wrap);
+    } else if (state.tab === 'lucro') {
+      renderLucroTab(wrap);
     } else if (state.tab === 'financeiro') {
       renderFinanceiroTab(wrap);
     } else {
