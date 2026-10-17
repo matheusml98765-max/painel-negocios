@@ -56,7 +56,7 @@
         if (x.tipo === 'cancelamento') p.cancelamentos += qtd;
         if (x.tipo === 'custo_devolucao') p.tarifas += Number(x.custo) || 0;
         else p.reembolso += (Number(it.preco) || 0) * qtd;
-        if (x.quebrado) {
+        if (x.quebrado && !x.coberto_pelo_ml) {
           p.quebradas += qtd; res.quebradas += qtd;
           var c = custoDoItem(id);
           if (c) { p.perda += c.valor * qtd; res.perdaPecas += c.valor * qtd; } else res.semCusto += qtd;
@@ -134,7 +134,7 @@
       t2.appendChild(el('tr', {}, [
         el('td', { text: String(x.data || '').slice(8, 10) + '/' + String(x.data || '').slice(5, 7) }),
         el('td', {}, [el('div', { class: 'pml-titulo-prod', text: it.titulo || '—' }), el('div', { class: 'pml-margin', text: (x.plataforma === 'ml' ? 'ML' : 'Shopee') + ' · pedido ' + x.pedido })]),
-        el('td', {}, [el('div', { text: x.motivo || '' }), x.texto && x.plataforma === 'shopee' ? el('div', { class: 'pml-margin', text: '“' + x.texto + '”' }) : null]),
+        el('td', {}, [el('div', { text: x.motivo || '' }), x.texto && x.plataforma === 'shopee' ? el('div', { class: 'pml-margin', text: '“' + x.texto + '”' }) : null, x.coberto_pelo_ml ? el('div', { class: 'pml-margin', style: 'color:var(--good);', text: 'O ML cobriu o custo (sem perda para você)' }) : null, x.status === 'CANCELLED' && x.plataforma === 'ml' ? el('div', { class: 'pml-margin', style: 'color:var(--good);', text: 'Decidido a seu favor' }) : null]),
         el('td', { class: 'num', text: fmtMoney(valor) })
       ]));
     });
@@ -149,6 +149,6 @@
       });
       card.appendChild(dFull);
     }
-    card.appendChild(el('p', { class: 'pml-note', text: 'Na Shopee, o valor devolvido já sai do recebido da venda (por isso já aparece no lucro do produto). Peça que chegou quebrada conta como perda do custo da peça. No ML, as tarifas de devolução da fatura são descontadas do lucro do produto. O motivo detalhado das devoluções do ML (quebrado, defeito...) precisa de mais uma permissão no app do ML.' + (state.devolucoes.atualizado_em ? ' Atualizado em ' + new Date(state.devolucoes.atualizado_em).toLocaleString('pt-BR') + '.' : '') }));
+    card.appendChild(el('p', { class: 'pml-note', text: 'Na Shopee, o valor devolvido já sai do recebido da venda (por isso já aparece no lucro do produto). Peça que chegou quebrada conta como perda do custo da peça. No ML, as tarifas de devolução da fatura são descontadas do lucro do produto. Reclamação do ML que o ML cobriu ou decidiu a seu favor não conta como perda.' + (state.devolucoes.atualizado_em ? ' Atualizado em ' + new Date(state.devolucoes.atualizado_em).toLocaleString('pt-BR') + '.' : '') }));
     wrap.appendChild(card);
   }
