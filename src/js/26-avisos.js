@@ -41,6 +41,7 @@
     });
     var sc = Object.keys(semCusto);
     if (sc.length && !visto('semcusto')) av.push({ k: 'semcusto', icone: '❓', texto: sc.length + ' produto(s) vendidos nesta semana sem custo cadastrado: ' + sc.slice(0, 3).map(function (k) { return String(semCusto[k]).slice(0, 40); }).join('; ') + (sc.length > 3 ? '...' : ''), ir: 'lucro', botao: 'Cadastrar custo' });
+    if (!tokenGist() && !visto('nuvem')) av.push({ k: 'nuvem', icone: '☁️', texto: 'Seus custos e cadastros estão só neste navegador. Ligue a cópia automática na nuvem para não perder nada.', ir: 'importar', botao: 'Ligar cópia' });
     // Automacao
     var h = horasDesdeAtualizacaoAutomacao();
     if (h !== null && h > 3 && new Date().getHours() >= 7) av.unshift({ k: 'auto', icone: '⚠️', texto: 'A automação não atualiza há ' + Math.round(h) + ' horas. As vendas podem estar faltando.', forte: true, fixo: true });
