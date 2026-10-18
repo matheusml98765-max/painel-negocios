@@ -324,3 +324,7 @@
   .dia-progresso { display: flex; gap: 12px; align-items: center; margin: 10px 0 16px; font-weight: 700; color: var(--ink); }
   .dia-barra { flex: 1; height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .dia-barra span { display: block; height: 100%; background: var(--good); border-radius: 99px; transition: width .3s; }
+
+  .aviso-link-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
+  .aviso-link-caixa { background: var(--surface); color: var(--ink); border: 2px solid var(--bad); border-radius: 16px; padding: 24px; max-width: 440px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .aviso-link-titulo { font-size: 18px; font-weight: 800; margin: 8px 0; color: var(--bad); }

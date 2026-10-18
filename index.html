@@ -345,6 +345,10 @@
   .dia-progresso { display: flex; gap: 12px; align-items: center; margin: 10px 0 16px; font-weight: 700; color: var(--ink); }
   .dia-barra { flex: 1; height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
   .dia-barra span { display: block; height: 100%; background: var(--good); border-radius: 99px; transition: width .3s; }
+
+  .aviso-link-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
+  .aviso-link-caixa { background: var(--surface); color: var(--ink); border: 2px solid var(--bad); border-radius: 16px; padding: 24px; max-width: 440px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .aviso-link-titulo { font-size: 18px; font-weight: 800; margin: 8px 0; color: var(--bad); }
 </style>
 
 <script>
@@ -1261,8 +1265,9 @@
     var syncCard = el('div', { class: 'pml-card' });
     syncCard.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Mercado Livre)' }));
     syncCard.appendChild(el('p', { style: 'font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do seu arquivo na nuvem (gist) uma única vez. Toda vez que você abrir esse painel, ele busca sozinho os dados mais recentes, sem precisar importar arquivo.' }));
-    var urlInput = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_classificados.json', value: state.gistUrl, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    var urlInput = el('input', { type: 'password', autocomplete: 'off', 'data-link-secreto': '1', placeholder: 'https://gist.githubusercontent.com/.../pedidos_classificados.json', value: state.gistUrl, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
     syncCard.appendChild(urlInput);
+    syncCard.appendChild(el('p', { class: 'pml-note', style: 'margin:-4px 0 10px;', text: '🔒 Link escondido por segurança (quem tem ele vê todos os seus dados). Dois cliques no campo para mostrar.' }));
     var btnRow = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
     var salvarBtn = el('button', {
       class: 'pml-btn', text: 'Salvar e sincronizar agora',
@@ -1291,7 +1296,7 @@
     var syncCardShopee = el('div', { class: 'pml-card' });
     syncCardShopee.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Shopee)' }));
     syncCardShopee.appendChild(el('p', { style: 'font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do arquivo pedidos_shopee.json do seu gist. Funciona igual à sincronização do Mercado Livre, só que pros dados da Shopee.' }));
-    var urlInputShopee = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_shopee.json', value: state.gistUrlShopee, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    var urlInputShopee = el('input', { type: 'password', autocomplete: 'off', 'data-link-secreto': '1', placeholder: 'https://gist.githubusercontent.com/.../pedidos_shopee.json', value: state.gistUrlShopee, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
     syncCardShopee.appendChild(urlInputShopee);
     var btnRowShopee = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
     var salvarBtnShopee = el('button', {
@@ -5076,6 +5081,47 @@
     wrap.appendChild(el('div', { style: 'text-align:center; margin:18px 0 8px;' }, [
       el('button', { class: 'pml-btn', style: 'padding:12px 26px; font-size:15px;', text: 'Começar o dia → ir para o painel', onclick: function () { state.tab = 'geral'; render(); window.scrollTo(0, 0); } })
     ]));
+  }
+  // ===================== PROTECAO DO LINK DO GIST =====================
+  // O link do Gist da acesso a todos os dados (vendas, CPF, contas, custos). Na tela ele fica
+  // escondido como senha, com botao de mostrar; ao copiar algo que contenha o link, aparece um
+  // aviso. Nao bloqueia: so lembra.
+
+  function pareceLinkSecreto(texto) {
+    var t = String(texto || '');
+    if (/gist\.github(usercontent)?\.com/i.test(t)) return true;
+    var id = state.gistUrl && (String(state.gistUrl).match(/\/([0-9a-f]{20,})\//i) || [])[1];
+    return !!(id && t.indexOf(id) !== -1);
+  }
+
+  function avisoLinkSecreto() {
+    if (document.getElementById('aviso-link')) return;
+    var fundo = el('div', { id: 'aviso-link', class: 'aviso-link-fundo', role: 'alertdialog', 'aria-label': 'Cuidado com o link' }, [
+      el('div', { class: 'aviso-link-caixa' }, [
+        el('div', { style: 'font-size:34px;', text: '🔒' }),
+        el('p', { class: 'aviso-link-titulo', text: 'Cuidado: esse é o link secreto dos seus dados' }),
+        el('p', { class: 'pml-margin', style: 'line-height:1.6;', text: 'Quem tiver esse link vê suas vendas, seu CPF, suas contas e seus custos. Não cole em grupo, conversa, print, vídeo ou site. Só use para configurar o painel num computador seu.' }),
+        el('button', { class: 'pml-btn', text: 'Entendi', onclick: function () { fundo.remove(); } })
+      ])
+    ]);
+    document.body.appendChild(fundo);
+  }
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    ['copy', 'cut'].forEach(function (ev) {
+      document.addEventListener(ev, function (e) {
+        var alvo = e.target;
+        var sel = '';
+        if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) sel = String(alvo.value || '').slice(alvo.selectionStart || 0, alvo.selectionEnd || 0) || alvo.value;
+        else if (window.getSelection) sel = String(window.getSelection());
+        if (pareceLinkSecreto(sel)) setTimeout(avisoLinkSecreto, 50);
+      }, true);
+    });
+    // Botao "mostrar" ao lado dos campos do link (ficam escondidos como senha)
+    document.addEventListener('dblclick', function (e) {
+      var a = e.target;
+      if (a && a.getAttribute && a.getAttribute('data-link-secreto')) { a.type = a.type === 'password' ? 'text' : 'password'; if (a.type === 'text') avisoLinkSecreto(); }
+    }, true);
   }
   function render() {
     destruirGraficos();

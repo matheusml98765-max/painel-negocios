@@ -141,8 +141,9 @@
     var syncCard = el('div', { class: 'pml-card' });
     syncCard.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Mercado Livre)' }));
     syncCard.appendChild(el('p', { style: 'font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do seu arquivo na nuvem (gist) uma única vez. Toda vez que você abrir esse painel, ele busca sozinho os dados mais recentes, sem precisar importar arquivo.' }));
-    var urlInput = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_classificados.json', value: state.gistUrl, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    var urlInput = el('input', { type: 'password', autocomplete: 'off', 'data-link-secreto': '1', placeholder: 'https://gist.githubusercontent.com/.../pedidos_classificados.json', value: state.gistUrl, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
     syncCard.appendChild(urlInput);
+    syncCard.appendChild(el('p', { class: 'pml-note', style: 'margin:-4px 0 10px;', text: '🔒 Link escondido por segurança (quem tem ele vê todos os seus dados). Dois cliques no campo para mostrar.' }));
     var btnRow = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
     var salvarBtn = el('button', {
       class: 'pml-btn', text: 'Salvar e sincronizar agora',
@@ -171,7 +172,7 @@
     var syncCardShopee = el('div', { class: 'pml-card' });
     syncCardShopee.appendChild(el('p', { class: 'pml-section-title', text: 'Sincronização automática (Shopee)' }));
     syncCardShopee.appendChild(el('p', { style: 'font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.6;', text: 'Cole aqui a URL do arquivo pedidos_shopee.json do seu gist. Funciona igual à sincronização do Mercado Livre, só que pros dados da Shopee.' }));
-    var urlInputShopee = el('input', { type: 'text', placeholder: 'https://gist.githubusercontent.com/.../pedidos_shopee.json', value: state.gistUrlShopee, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
+    var urlInputShopee = el('input', { type: 'password', autocomplete: 'off', 'data-link-secreto': '1', placeholder: 'https://gist.githubusercontent.com/.../pedidos_shopee.json', value: state.gistUrlShopee, style: 'width:100%; padding:8px 10px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; margin-bottom:10px;' });
     syncCardShopee.appendChild(urlInputShopee);
     var btnRowShopee = el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' });
     var salvarBtnShopee = el('button', {
