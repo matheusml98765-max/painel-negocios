@@ -328,3 +328,15 @@
   .aviso-link-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 16px; }
   .aviso-link-caixa { background: var(--surface); color: var(--ink); border: 2px solid var(--bad); border-radius: 16px; padding: 24px; max-width: 440px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
   .aviso-link-titulo { font-size: 18px; font-weight: 800; margin: 8px 0; color: var(--bad); }
+
+  .escada-linha { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 4px; border-top: 1px solid var(--line); }
+  .escada-linha:first-of-type { border-top: 0; }
+  .escada-rotulo { font-weight: 600; color: var(--ink); }
+  .escada-valor { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .escada-linha.menos .escada-valor { color: var(--muted); }
+  .escada-linha.total .escada-rotulo, .escada-linha.total .escada-valor { font-size: 16px; }
+  .escada-linha.subtotal { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 8px; }
+  .escada-linha.destaque { border-radius: 10px; padding: 12px 10px; margin-top: 6px; border: 1px solid var(--line); }
+  .escada-linha.destaque .escada-rotulo, .escada-linha.destaque .escada-valor { font-size: 18px; font-weight: 800; }
+  .escada-linha.destaque.pos .escada-valor { color: var(--good); }
+  .escada-linha.destaque.neg .escada-valor { color: var(--bad); }

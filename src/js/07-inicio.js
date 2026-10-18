@@ -70,6 +70,9 @@
     var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
     grid.appendChild(blocoMetas(d, lucroMesCalc));
     renderVendasDoDia(grid);
+    var escWrap = el('section', { class: 'ini-bloco ini-c12' });
+    renderEscadaCard(escWrap, isoHoje(0).slice(0, 8) + '01', isoHoje(0), 'Este mês: do faturamento ao seu bolso');
+    grid.appendChild(escWrap);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });

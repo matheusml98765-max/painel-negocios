@@ -323,3 +323,29 @@ test('contagem com a origem de cada parte (450 do ML + 50 da Shopee)', () => {
   assert.equal(f.fila[0].data, '2026-08-07'); perto(f.fila[0].qtd, 50, 'shopee primeiro');
   perto(f.fila[1].qtd, 450, 'ml depois'); perto(f.sobra, 500, 'total');
 });
+
+test('escada do lucro: operação, lucro real (Ads, antecipação, Full) e bolso (contas fixas)', () => {
+  const p = painelBase();
+  p.state.configLucro.imposto = 4;
+  p.state.custosAvulsos = { MLB1: 20 };
+  p.state.transacoes = [
+    { tipo: 'venda', data: '2026-09-10', valor: 100, itens: [{ item_id: 'MLB1', quantidade: 1, preco_unitario: 100, comissao: 15 }], custosMl: { comissao: 15, frete: 5, liquido_recebido: 80 } },
+  ];
+  p.state.adsShopee = { dias: [{ data: '2026-09-10', gasto: 6 }, { data: '2026-08-01', gasto: 99 }] };
+  // fatura de 30 dias (21/08 a 19/09), 19 deles dentro de setembro => 19/30 de cada cobrança fora da venda
+  p.state.faturamento = { periodos: [{ de: '2026-08-21', ate: '2026-09-19', linhas: [
+    { categoria: 'Antecipação', valor: 30 }, { categoria: 'Publicidade', valor: 15 }, { categoria: 'Full', valor: 9 },
+    { categoria: 'Comissões', valor: 500 }, { categoria: 'Parcelamento', valor: 300 } ] }] };
+  p.state.contasRemotas = { contas: [
+    { id: 'f1', tipo: 'fixa', nome: 'Contador', valor: 10, dia: 20, de: 'empresa', categoria: 'Serviços' },
+    { id: 'p1', tipo: 'parcela', nome: 'Impressora', valor: 50, parcelas: 5, primeira: '2026-09', dia: 6, de: 'empresa', categoria: 'Equipamentos' },
+    { id: 'f2', tipo: 'fixa', nome: 'Apple', valor: 5, dia: 9, de: 'cpf' } ] };
+  const e = p.calcEscada('2026-09-01', '2026-09-30');
+  perto(e.t.lucro, 80 - 4 - 20, 'lucro da operação');
+  perto(e.adsShopee, 6, 'Ads Shopee do período');
+  perto(e.fatura.antecipacao, 19, 'antecipação proporcional');
+  perto(e.fatura.adsMl, 9.5, 'Ads ML proporcional'); perto(e.fatura.full, 5.7, 'Full proporcional');
+  perto(e.lucroReal, 56 - 6 - 9.5 - 19 - 5.7, 'lucro real (comissão e parcelamento da fatura não contam de novo)');
+  perto(e.fixas, 10, 'só contas fixas da loja'); perto(e.invest, 50, 'impressora é investimento');
+  perto(e.bolso, 15.8 - 10, 'sobrou no bolso');
+});

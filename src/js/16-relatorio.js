@@ -144,12 +144,16 @@
     wrap.appendChild(cardNota);
 
     var variacao = r.anterior.total ? (r.emAndamento ? r.projecao : r.vendas.total) / r.anterior.total - 1 : null;
+    var ivR = intervaloMes(mes), ateR = ivR.ate > isoHoje(0) ? isoHoje(0) : ivR.ate;
+    var escR = calcEscada(ivR.de, ateR);
     wrap.appendChild(el('div', { class: 'pml-metrics' }, [
       metricaFicha('Faturamento', fmtMoney(r.vendas.total), r.vendas.pedidos + ' pedidos' + (r.emAndamento && r.projecao ? ' · projeção ' + fmtMoney(r.projecao) : '')),
       metricaFicha('Contra o mês anterior', variacao === null ? '—' : (variacao >= 0 ? '+' : '') + fmtPct(variacao), r.anterior.total ? 'mês anterior: ' + fmtMoney(r.anterior.total) : (r.anterior.completo ? 'sem vendas no mês anterior' : 'o painel ainda não tem o mês anterior inteiro'), variacao === null ? '' : (variacao >= 0 ? 'pos' : 'neg')),
-      metricaFicha('Lucro real', r.receitaComCusto ? fmtMoney(r.lucroAposAds) : '—', r.receitaComCusto ? 'margem ' + fmtPct(r.margem) + ', já sem imposto e Ads (produtos com custo)' : 'cadastre os custos para ver', r.receitaComCusto ? (r.lucroAposAds >= 0 ? 'pos' : 'neg') : ''),
+      metricaFicha('Lucro real', escR.t.receita ? fmtMoney(escR.lucroReal) : '—', escR.t.receita ? 'já sem imposto, Ads, antecipação e Full (veja a escada abaixo)' : 'cadastre os custos para ver', escR.lucroReal >= 0 ? 'pos' : 'neg'),
       metricaFicha('Shopee Ads', fmtMoney(r.ads.gasto), r.ads.gasto ? 'trouxe ' + fmtMoney(r.ads.vendas) + (r.ads.dias < intervaloMes(mes).diasNoMes && !r.emAndamento ? ' (só ' + r.ads.dias + ' dias com dados)' : '') : 'sem gasto registrado')
     ]));
+
+    renderEscadaCard(wrap, ivR.de, ateR, 'Do faturamento ao seu bolso (' + (ateR < ivR.ate ? 'até hoje' : 'mês inteiro') + ')');
 
     var cardProb = el('div', { class: 'pml-card' });
     cardProb.appendChild(el('p', { class: 'pml-section-title', text: r.emJogo > 0 ? 'Problemas e oportunidades: ' + fmtMoney(r.emJogo) + ' em jogo' : 'Problemas e oportunidades' }));
