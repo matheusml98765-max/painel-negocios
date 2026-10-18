@@ -316,3 +316,11 @@
   .conq-item { display: flex; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
   .conq-item:first-of-type { border-top: 0; }
   .conq-icone { font-size: 26px; width: 34px; text-align: center; }
+
+  .dia-topo { text-align: center; padding: 18px 12px 8px; }
+  .dia-topo h1 { font-size: 34px; margin: 0; color: var(--ink); }
+  .dia-data { color: var(--muted); margin: 6px 0 14px; font-size: 15px; }
+  .dia-frase { font-size: 19px; font-weight: 600; color: var(--ink); max-width: 680px; margin: 0 auto 8px; line-height: 1.45; }
+  .dia-progresso { display: flex; gap: 12px; align-items: center; margin: 10px 0 16px; font-weight: 700; color: var(--ink); }
+  .dia-barra { flex: 1; height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .dia-barra span { display: block; height: 100%; background: var(--good); border-radius: 99px; transition: width .3s; }
