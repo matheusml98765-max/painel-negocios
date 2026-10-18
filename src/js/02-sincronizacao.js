@@ -169,6 +169,26 @@
     try { await window.storage.set('ml-config-lucro', JSON.stringify(state.configLucro)); } catch (e) {}
   }
 
+  // Historico do ano (historico_ml.json / historico_shopee.json da automacao): vendas de antes da
+  // janela de 35 dias. Busca no maximo a cada 6 h e nao baixa o estoque (sao vendas antigas).
+  async function sincronizarHistorico(urlGist, nome, prefixo, rotulo) {
+    if (!urlGist) return;
+    var chave = 'ml-historico-' + nome, agora = Date.now();
+    try { var u = await window.storage.get(chave); if (u && agora - Number(u.value) < 6 * 3600 * 1000) return; } catch (e) {}
+    try {
+      var r = await fetch(urlArquivoIrmao(urlGist, nome) + '?_=' + agora);
+      if (!r.ok) return;
+      var res = parseApiJson(await r.text(), prefixo, rotulo);
+      if (res.erro) return;
+      if (res.novas.length) {
+        state.transacoes = state.transacoes.concat(res.novas);
+        state.transacoes.sort(function (a, b) { return b.data.localeCompare(a.data); });
+      }
+      if (res.novas.length || res.atualizadas) await saveTransacoes();
+      try { await window.storage.set(chave, String(agora)); } catch (e) {}
+    } catch (e) {}
+  }
+
   async function sincronizarGist(silencioso) {
     if (!state.gistUrl) return;
     state.sincronizando = true;
@@ -191,6 +211,7 @@
       } else if (!resultado.erro && resultado.atualizadas > 0) {
         await saveTransacoes();
       }
+      await sincronizarHistorico(state.gistUrl, 'historico_ml.json', 'api-ml-', 'Mercado Livre');
       await sincronizarFaturamento();
       await sincronizarAnunciosMl();
       await sincronizarTarefasCpf();
@@ -226,6 +247,7 @@
       } else if (!resultado.erro && resultado.atualizadas > 0) {
         await saveTransacoes();
       }
+      await sincronizarHistorico(state.gistUrlShopee, 'historico_shopee.json', 'api-shopee-', 'Shopee');
       await sincronizarAdsShopee();
       state.ultimaSincronizacaoShopee = new Date().toLocaleString('pt-BR');
       try { await window.storage.set('ml-ultima-sync-shopee', state.ultimaSincronizacaoShopee); } catch (e) {}
