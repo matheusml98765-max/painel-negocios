@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 <div id="app-root">
@@ -16,7 +16,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <style>
   /* ============ Tema: Top Brasil Shop (roxo + azul elétrico) ============ */
@@ -751,12 +751,32 @@
     return { valorEstoque: valorEstoque, qtdProdutos: qtdProdutos, saldoMes: saldoMes, saldoTotal: saldoTotal };
   }
 
+  // Texto com formatacao simples (negrito, quebra de linha, cor) vindo de dados de fora:
+  // so passam b/strong/i/em/br/span/small e os atributos style e class; o resto vira texto.
+  var TAGS_OK = { B: 1, STRONG: 1, I: 1, EM: 1, BR: 1, SPAN: 1, SMALL: 1 };
+  function htmlSeguro(html) {
+    var t = document.createElement('template');
+    t.innerHTML = String(html === undefined || html === null ? '' : html);
+    (function limpar(no) {
+      Array.prototype.slice.call(no.childNodes).forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!TAGS_OK[n.tagName]) { no.replaceChild(document.createTextNode(n.textContent), n); return; }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) {
+            if ((a.name !== 'style' && a.name !== 'class') || /url\s*\(|expression|javascript:/i.test(a.value)) n.removeAttribute(a.name);
+          });
+          limpar(n);
+        } else if (n.nodeType !== 3) no.removeChild(n);
+      });
+    })(t.content);
+    var d = document.createElement('div'); d.appendChild(t.content); return d.innerHTML;
+  }
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     attrs = attrs || {};
     Object.keys(attrs).forEach(function (k) {
       if (k === 'text') e.textContent = attrs[k];
-      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k === 'html') e.innerHTML = htmlSeguro(attrs[k]);
       else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
       else e.setAttribute(k, attrs[k]);
     });

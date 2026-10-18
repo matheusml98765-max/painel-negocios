@@ -87,12 +87,32 @@
     return { valorEstoque: valorEstoque, qtdProdutos: qtdProdutos, saldoMes: saldoMes, saldoTotal: saldoTotal };
   }
 
+  // Texto com formatacao simples (negrito, quebra de linha, cor) vindo de dados de fora:
+  // so passam b/strong/i/em/br/span/small e os atributos style e class; o resto vira texto.
+  var TAGS_OK = { B: 1, STRONG: 1, I: 1, EM: 1, BR: 1, SPAN: 1, SMALL: 1 };
+  function htmlSeguro(html) {
+    var t = document.createElement('template');
+    t.innerHTML = String(html === undefined || html === null ? '' : html);
+    (function limpar(no) {
+      Array.prototype.slice.call(no.childNodes).forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!TAGS_OK[n.tagName]) { no.replaceChild(document.createTextNode(n.textContent), n); return; }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) {
+            if ((a.name !== 'style' && a.name !== 'class') || /url\s*\(|expression|javascript:/i.test(a.value)) n.removeAttribute(a.name);
+          });
+          limpar(n);
+        } else if (n.nodeType !== 3) no.removeChild(n);
+      });
+    })(t.content);
+    var d = document.createElement('div'); d.appendChild(t.content); return d.innerHTML;
+  }
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     attrs = attrs || {};
     Object.keys(attrs).forEach(function (k) {
       if (k === 'text') e.textContent = attrs[k];
-      else if (k === 'html') e.innerHTML = attrs[k];
+      else if (k === 'html') e.innerHTML = htmlSeguro(attrs[k]);
       else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
       else e.setAttribute(k, attrs[k]);
     });
