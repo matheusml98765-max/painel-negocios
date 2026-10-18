@@ -31,6 +31,13 @@
   // Taxas reais de uma venda, vindas da automacao (ML ou Shopee). null = sem dados.
   function custosDaVenda(t) {
     var valor = Number(t.valor) || 0;
+    var ext = typeof vendaPeloExtrato === 'function' ? vendaPeloExtrato(t) : null;
+    if (ext) {
+      // Venda do ML ja liberada: vale o que caiu na conta (relatorio de liberacoes do Mercado Pago)
+      var base = t.custosMl || {};
+      return { plataforma: 'ml', liquido: ext.liquido, comissao: Number(base.comissao) || Math.max(0, valor - ext.liquido), frete: Number(base.frete) || 0,
+        comissaoPorItem: !!t.custosMl, extrato: true, devolvido: ext.devolvido, comDevolucao: ext.comDevolucao };
+    }
     if (t.custosMl) {
       var c = t.custosMl;
       var liq = (c.liquido_recebido !== null && c.liquido_recebido !== undefined) ? Number(c.liquido_recebido) : valor - (Number(c.comissao) || 0) - (Number(c.frete) || 0);
@@ -76,7 +83,8 @@
     var semDados = 0;
 
     state.transacoes.forEach(function (t) {
-      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
+      var ficou = typeof cancelamentoQueFicou === 'function' ? cancelamentoQueFicou(t) : null;
+      if ((t.tipo !== 'venda' && !ficou) || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
       var c = custosDaVenda(t);
       var origem = t.origemId || '';
       if (!c) {
@@ -91,11 +99,14 @@
         var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
         var id = String(i.item_id || 'sem-id');
         var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0, custoAcum: 0, semCusto: false });
-        g.unidades += qtd;
-        var cv = custoDoItem(id, t.data);
-        if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
+        // Devolvida (o comprador recebeu o dinheiro de volta): o produto voltou, entao nao entra no custo
+        if (!c.devolvido) {
+          g.unidades += qtd;
+          var cv = custoDoItem(id, t.data);
+          if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
+        } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;
-        g.receita += valor * parte;
+        if (!c.devolvido) g.receita += valor * parte;   // devolvida: a nota e cancelada, fica so o prejuizo
         g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
         g.frete += c.frete * parte;
         g.liquido += c.liquido * parte;
@@ -115,7 +126,7 @@
       g.taxasMl = g.receita - g.liquido;
       g.precoMedio = g.unidades ? g.receita / g.unidades : 0;
       if (g.custoUnit !== null) {
-        g.custoTotal = g.custoUnit * g.unidades;
+        g.custoTotal = g.custoAcum;
         g.lucro = g.liquido - g.imposto - g.custoTotal - g.tarifasDevolucao;
         g.lucroUnit = g.unidades ? g.lucro / g.unidades : 0;
         g.margem = g.receita ? g.lucro / g.receita : null;

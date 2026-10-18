@@ -381,7 +381,7 @@
   }
 
   var root = document.getElementById('app-root');
-  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana', diaVendas: '', atualizandoAgora: null, pedirTokenAtualizar: false, erroToken: '', producaoRemota: null, abrirFalha: false, ultimaCopiaNuvem: null, erroNuvem: '', receberRemoto: null, conquistasRemotas: null, rotinaRemota: null };
+  var state = { tab: 'geral', produtos: [], transacoes: [], loaded: false, errorMsg: '', gistUrl: '', gistUrlShopee: '', ultimaSincronizacao: '', ultimaSincronizacaoShopee: '', sincronizando: false, sincronizandoShopee: false, confirmarLimpeza: false, editandoProdutoId: null, ultimaBaixaEstoque: [], faturamento: null, adsShopee: null, custosAvulsos: {}, configLucro: { imposto: 4, margemAlvo: 25, dias: 30, ordem: 'receita', plataforma: 'todas' }, fatPeriodo: '', calc3d: null, metas: {}, editandoMeta: false, statusAuto: null, fichaProduto: null, simDesconto: 10, relMes: '', anunciosMl: null, devolucoes: null, liberacoes: null, mesLuz: '', cpfMes: '', tarefasRemotas: null, cpfRemoto: null, contasRemotas: null, contasMes: '', comprasVisao: 'semana', diaVendas: '', atualizandoAgora: null, pedirTokenAtualizar: false, erroToken: '', producaoRemota: null, abrirFalha: false, ultimaCopiaNuvem: null, erroNuvem: '', receberRemoto: null, conquistasRemotas: null, rotinaRemota: null };
 
   function fmtMoney(n) {
     var v = Number(n);
@@ -476,6 +476,10 @@
       state.faturamento = fa ? JSON.parse(fa.value) : null;
     } catch (e) { state.faturamento = null; }
     try {
+      var lb = await window.storage.get('ml-liberacoes');
+      state.liberacoes = lb ? JSON.parse(lb.value) : null;
+    } catch (e) { state.liberacoes = null; }
+    try {
       var an = await window.storage.get('ml-anuncios');
       state.anunciosMl = an ? JSON.parse(an.value) : null;
     } catch (e) { state.anunciosMl = null; }
@@ -563,6 +567,17 @@
       if (dados && Array.isArray(dados.itens)) {
         state.anunciosMl = dados;
         try { await window.storage.set('ml-anuncios', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+    try {
+      // Relatorio de liberacoes do Mercado Pago (dinheiro que entrou e saiu de cada venda)
+      var rl = await fetch(urlArquivoIrmao(state.gistUrl, 'liberacoes_mp.json') + '?_=' + Date.now());
+      if (rl.ok) {
+        var lb = await rl.json();
+        if (lb && lb.pedidos) {
+          state.liberacoes = lb;
+          try { await window.storage.set('ml-liberacoes', JSON.stringify(lb)); } catch (e) {}
+        }
       }
     } catch (e) {}
     try {
@@ -1444,13 +1459,19 @@
         if (vendaAntes) {
           vendaAntes.tipo = 'cancelamento';
           vendaAntes.origemId = origemId;
-          delete vendaAntes.itens; delete vendaAntes.custosMl; delete vendaAntes.custosShopee;
+          // os itens ficam: se o dinheiro ficou com o vendedor (relatorio de liberacoes), conta como venda
+          if (Array.isArray(item.itens)) vendaAntes.itens = item.itens;
+          delete vendaAntes.custosMl; delete vendaAntes.custosShopee;
           atualizadas++;
           return;
         }
       }
       if (existente) {
         var mudou = false;
+        if (tipo === 'cancelamento' && Array.isArray(item.itens) && !Array.isArray(existente.itens)) {
+          existente.itens = item.itens;
+          mudou = true;
+        }
         if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || ((item.custos_ml || item.custos_shopee) && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
           existente.itens = item.itens;
           mudou = true;
@@ -1475,7 +1496,7 @@
         descricao: labelFonte + ' (API) - pedido ' + item.id,
         valor: Math.abs(valor)
       };
-      if (tipo === 'venda' && Array.isArray(item.itens)) {
+      if ((tipo === 'venda' || tipo === 'cancelamento') && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
       }
       if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }
@@ -2312,6 +2333,13 @@
   // Taxas reais de uma venda, vindas da automacao (ML ou Shopee). null = sem dados.
   function custosDaVenda(t) {
     var valor = Number(t.valor) || 0;
+    var ext = typeof vendaPeloExtrato === 'function' ? vendaPeloExtrato(t) : null;
+    if (ext) {
+      // Venda do ML ja liberada: vale o que caiu na conta (relatorio de liberacoes do Mercado Pago)
+      var base = t.custosMl || {};
+      return { plataforma: 'ml', liquido: ext.liquido, comissao: Number(base.comissao) || Math.max(0, valor - ext.liquido), frete: Number(base.frete) || 0,
+        comissaoPorItem: !!t.custosMl, extrato: true, devolvido: ext.devolvido, comDevolucao: ext.comDevolucao };
+    }
     if (t.custosMl) {
       var c = t.custosMl;
       var liq = (c.liquido_recebido !== null && c.liquido_recebido !== undefined) ? Number(c.liquido_recebido) : valor - (Number(c.comissao) || 0) - (Number(c.frete) || 0);
@@ -2357,7 +2385,8 @@
     var semDados = 0;
 
     state.transacoes.forEach(function (t) {
-      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
+      var ficou = typeof cancelamentoQueFicou === 'function' ? cancelamentoQueFicou(t) : null;
+      if ((t.tipo !== 'venda' && !ficou) || !Array.isArray(t.itens) || t.data < limiteStr || (ateStr && t.data > ateStr)) return;
       var c = custosDaVenda(t);
       var origem = t.origemId || '';
       if (!c) {
@@ -2372,11 +2401,14 @@
         var parte = brutoItens > 0 ? ((Number(i.preco_unitario) || 0) * qtd) / brutoItens : 1 / t.itens.length;
         var id = String(i.item_id || 'sem-id');
         var g = grupos[id] || (grupos[id] = { itemId: id, plataforma: c.plataforma, titulo: i.titulo || id, tipoAnuncio: i.tipo_anuncio || '', unidades: 0, vendas: 0, receita: 0, comissao: 0, frete: 0, liquido: 0, afiliados: 0, custoAcum: 0, semCusto: false });
-        g.unidades += qtd;
-        var cv = custoDoItem(id, t.data);
-        if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
+        // Devolvida (o comprador recebeu o dinheiro de volta): o produto voltou, entao nao entra no custo
+        if (!c.devolvido) {
+          g.unidades += qtd;
+          var cv = custoDoItem(id, t.data);
+          if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
+        } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;
-        g.receita += valor * parte;
+        if (!c.devolvido) g.receita += valor * parte;   // devolvida: a nota e cancelada, fica so o prejuizo
         g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
         g.frete += c.frete * parte;
         g.liquido += c.liquido * parte;
@@ -2396,7 +2428,7 @@
       g.taxasMl = g.receita - g.liquido;
       g.precoMedio = g.unidades ? g.receita / g.unidades : 0;
       if (g.custoUnit !== null) {
-        g.custoTotal = g.custoUnit * g.unidades;
+        g.custoTotal = g.custoAcum;
         g.lucro = g.liquido - g.imposto - g.custoTotal - g.tarifasDevolucao;
         g.lucroUnit = g.unidades ? g.lucro / g.unidades : 0;
         g.margem = g.receita ? g.lucro / g.receita : null;
@@ -5167,7 +5199,7 @@
       if (ini > fim) return;
       var parte = diasEntre(ini, fim) / Math.max(1, diasEntre(p.de, fimReal));
       p.linhas.forEach(function (l) {
-        var k = FATURA_FORA_DA_VENDA[l.categoria];
+        var k = FATURA_FORA_DA_VENDA[l.categoria];  // a antecipacao pode ser trocada pelo valor real em calcEscada
         if (k && l.valor > 0) { r[k] += l.valor * parte; r.temDados = true; }
         // Bonificacao do Product Ads (credito do ML): abate do Ads do ML
         if (l.valor < 0 && (l.codigo === 'BPAD' || /publicidade|product ads/i.test(l.descricao || ''))) { r.adsMl += l.valor * parte; r.bonusAds += -l.valor * parte; }
@@ -5189,6 +5221,9 @@
     var adsSp = 0;
     ((state.adsShopee && state.adsShopee.dias) || []).forEach(function (d) { if (d.data >= de && d.data <= ate) adsSp += Number(d.gasto) || 0; });
     var fat = faturaNoIntervalo(de, ate);
+    // Antecipacao cobrada de verdade (relatorio de liberacoes) em vez da fatura repartida pelos dias
+    var antReal = typeof antecipacaoNoIntervalo === 'function' ? antecipacaoNoIntervalo(de, ate) : null;
+    if (antReal !== null) { fat.antecipacao = antReal; fat.antecipacaoReal = true; }
     var lucroReal = t.lucro - adsSp - fat.adsMl - fat.antecipacao - fat.full - fat.outros;
 
     // Contas do mes do fim do intervalo: fixas da loja x investimentos (o DAS ja esta no imposto)
@@ -5225,13 +5260,14 @@
     card.appendChild(degrau('Lucro da operação', t.lucro, 'o que os produtos deixaram' + pct(t.lucro), 'subtotal'));
     card.appendChild(degrau('Ads da Shopee', e.adsShopee, '', 'menos'));
     card.appendChild(degrau('Ads do Mercado Livre', e.fatura.adsMl, 'da fatura do ML' + (e.fatura.bonusAds >= 0.5 ? ', já tirando ' + fmtMoney(e.fatura.bonusAds) + ' que o ML devolveu de bonificação' : ''), 'menos'));
-    card.appendChild(degrau('Antecipação do Mercado Pago', e.fatura.antecipacao, 'para receber antes do prazo', 'menos'));
+    card.appendChild(degrau('Antecipação do Mercado Pago', e.fatura.antecipacao, e.fatura.antecipacaoReal ? 'o que o Mercado Pago cobrou de verdade nesses dias' : 'para receber antes do prazo (fatura repartida pelos dias)', 'menos'));
     card.appendChild(degrau('Full e outras cobranças', e.fatura.full + e.fatura.outros, 'armazenagem do Full e outras cobranças da fatura', 'menos'));
     card.appendChild(degrau('Lucro real', e.lucroReal, 'o que a loja gerou de verdade' + pct(e.lucroReal), 'destaque ' + (e.lucroReal >= 0 ? 'pos' : 'neg')));
     card.appendChild(degrau('Contas fixas da loja', e.fixas, e.listaFixas.map(function (i) { return i.nome; }).join(', ') || 'nenhuma lançada', 'menos'));
     card.appendChild(degrau('Sobrou no bolso', e.bolso, '', 'destaque ' + (e.bolso >= 0 ? 'pos' : 'neg')));
     if (e.invest) card.appendChild(el('p', { class: 'pml-note', text: 'Investimentos no mês (fora da conta, porque viram patrimônio): ' + e.listaInvest.map(function (i) { return i.nome + ' ' + fmtMoney(i.valor); }).join(' · ') + ' = ' + fmtMoney(e.invest) + '.' }));
     var notas = [];
+    if (state.liberacoes && state.liberacoes.pedidos) notas.push('Vendas do ML já liberadas usam o que caiu na sua conta (relatório de liberações do Mercado Pago), com devoluções e frete devolvido.');
     if (t.semCusto) notas.push(t.semCusto + ' produto(s) sem custo cadastrado (' + fmtMoney(t.receitaSemCusto) + ' em vendas) ficaram fora do lucro.');
     if (!e.fatura.temDados) notas.push('A fatura do ML deste período ainda não chegou: Ads do ML, antecipação e Full podem estar faltando.');
     else notas.push('Cobranças da fatura do ML entram proporcionais aos dias do período.');
@@ -5291,6 +5327,55 @@
     card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
     card.appendChild(el('p', { class: 'pml-note', text: 'Cada valor é o lucro do pedido inteiro, já sem taxas, imposto e custo, e antes do Ads. No kit, a embalagem pode sair mais barata (1 saco e 1 etiqueta para tudo). Na Shopee dá para criar o kit como variação do anúncio ("2 unidades") ou usar o Desconto por quantidade ("leve 2, pague menos").' }));
     wrap.appendChild(card);
+  }
+  // ===================== LIBERACOES DO MERCADO PAGO =====================
+  // O dinheiro que entrou e saiu de verdade em cada venda do ML (liberacoes_mp.json da automacao,
+  // o mesmo relatorio de "Relatorios > Liberacoes" do Mercado Pago). Quando a venda ja foi liberada,
+  // ele vale mais que a API: inclui o frete devolvido em linha separada, a devolucao descontada dias
+  // depois e a reclamacao encerrada a favor do vendedor. Venda ainda nao liberada usa a API.
+
+  function pedidoMlDe(t) {
+    var m = /^api-ml-(\d+)-/.exec((t && t.origemId) || '');
+    return m ? m[1] : null;
+  }
+
+  function liberacaoDoPedido(t) {
+    var L = state.liberacoes;
+    if (!L || !L.pedidos) return null;
+    var id = pedidoMlDe(t);
+    return id ? (L.pedidos[id] || null) : null;
+  }
+
+  // total: tudo o que o pedido deixou na conta. devolvido: o comprador recebeu o dinheiro de volta
+  // (o produto voltou, entao o custo dele nao conta; fica so o prejuizo do frete e das taxas).
+  function vendaPeloExtrato(t) {
+    var l = liberacaoDoPedido(t);
+    if (!l) return null;
+    var dev = Number(l.devolucao) || 0;
+    var total = round2((Number(l.liquido) || 0) + dev + (Number(l.outros) || 0));
+    var teveDev = Math.abs(dev) > 0.005;
+    return { liquido: total, comDevolucao: teveDev, devolvido: teveDev && total <= 0.01 };
+  }
+
+  // Cancelamento em que o dinheiro ficou com o vendedor (ex.: reclamacao encerrada a favor dele e
+  // produto descartado pelo ML): na pratica e uma venda, e o produto foi embora.
+  function cancelamentoQueFicou(t) {
+    if (!t || t.tipo !== 'cancelamento' || !Array.isArray(t.itens) || !t.itens.length) return null;
+    var e = vendaPeloExtrato(t);
+    return e && e.liquido > 0.5 ? e : null;
+  }
+
+  // Tarifa de antecipacao cobrada de verdade no intervalo. null = o relatorio nao cobre esses dias.
+  function antecipacaoNoIntervalo(de, ate) {
+    var L = state.liberacoes;
+    if (!L || !L.antecipacao || !Array.isArray(L.cobertura)) return null;
+    var ontem = isoHoje(-1);
+    var fim = ate < ontem ? ate : ontem;
+    var coberto = L.cobertura.some(function (c) { return c[0] <= de && c[1] >= fim; });
+    if (!coberto) return null;
+    return Object.keys(L.antecipacao).reduce(function (s, d) {
+      return d >= de && d <= ate ? s + (Number(L.antecipacao[d]) || 0) : s;
+    }, 0);
   }
   function render() {
     destruirGraficos();

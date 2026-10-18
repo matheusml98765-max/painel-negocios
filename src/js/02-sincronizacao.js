@@ -32,6 +32,10 @@
       state.faturamento = fa ? JSON.parse(fa.value) : null;
     } catch (e) { state.faturamento = null; }
     try {
+      var lb = await window.storage.get('ml-liberacoes');
+      state.liberacoes = lb ? JSON.parse(lb.value) : null;
+    } catch (e) { state.liberacoes = null; }
+    try {
       var an = await window.storage.get('ml-anuncios');
       state.anunciosMl = an ? JSON.parse(an.value) : null;
     } catch (e) { state.anunciosMl = null; }
@@ -119,6 +123,17 @@
       if (dados && Array.isArray(dados.itens)) {
         state.anunciosMl = dados;
         try { await window.storage.set('ml-anuncios', JSON.stringify(dados)); } catch (e) {}
+      }
+    } catch (e) {}
+    try {
+      // Relatorio de liberacoes do Mercado Pago (dinheiro que entrou e saiu de cada venda)
+      var rl = await fetch(urlArquivoIrmao(state.gistUrl, 'liberacoes_mp.json') + '?_=' + Date.now());
+      if (rl.ok) {
+        var lb = await rl.json();
+        if (lb && lb.pedidos) {
+          state.liberacoes = lb;
+          try { await window.storage.set('ml-liberacoes', JSON.stringify(lb)); } catch (e) {}
+        }
       }
     } catch (e) {}
     try {

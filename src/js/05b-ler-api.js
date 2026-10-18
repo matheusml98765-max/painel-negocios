@@ -29,13 +29,19 @@
         if (vendaAntes) {
           vendaAntes.tipo = 'cancelamento';
           vendaAntes.origemId = origemId;
-          delete vendaAntes.itens; delete vendaAntes.custosMl; delete vendaAntes.custosShopee;
+          // os itens ficam: se o dinheiro ficou com o vendedor (relatorio de liberacoes), conta como venda
+          if (Array.isArray(item.itens)) vendaAntes.itens = item.itens;
+          delete vendaAntes.custosMl; delete vendaAntes.custosShopee;
           atualizadas++;
           return;
         }
       }
       if (existente) {
         var mudou = false;
+        if (tipo === 'cancelamento' && Array.isArray(item.itens) && !Array.isArray(existente.itens)) {
+          existente.itens = item.itens;
+          mudou = true;
+        }
         if (tipo === 'venda' && Array.isArray(item.itens) && (!Array.isArray(existente.itens) || ((item.custos_ml || item.custos_shopee) && JSON.stringify(existente.itens) !== JSON.stringify(item.itens)))) {
           existente.itens = item.itens;
           mudou = true;
@@ -60,7 +66,7 @@
         descricao: labelFonte + ' (API) - pedido ' + item.id,
         valor: Math.abs(valor)
       };
-      if (tipo === 'venda' && Array.isArray(item.itens)) {
+      if ((tipo === 'venda' || tipo === 'cancelamento') && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
       }
       if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }

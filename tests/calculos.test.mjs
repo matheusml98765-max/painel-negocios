@@ -364,3 +364,33 @@ test('kits: taxa fixa por pedido dividida entre as unidades', () => {
   perto(k.op[1].lucroKit, 2 * 26.77 * 0.95 * (1 - 0.297 - 0.04) - 4.5 - 2 * 7.69, 'kit de 2 com 5% off');
   assert.ok(k.op[1].porUnidade > k.op[0].porUnidade, 'kit lucra mais por unidade');
 });
+
+test('venda do ML já liberada usa o relatório de liberações do Mercado Pago', () => {
+  const p = painelBase();
+  const d = hoje();
+  p.state.custosAvulsos = { MLB1: 30, MLB2: 50, MLB3: 100 };
+  p.state.transacoes = [
+    // Gillette: a API dizia 67,32, mas o MP pagou 67,32 + 19,99 de frete devolvido
+    { tipo: 'venda', data: d, valor: 109.9, origemId: 'api-ml-111-venda', itens: [{ item_id: 'MLB1', quantidade: 1, preco_unitario: 109.9, comissao: 15.39 }], custosMl: { comissao: 15.39, frete: 27.19, liquido_recebido: 67.32 } },
+    // Devolvida: o comprador recebeu o dinheiro de volta; o produto voltou (sem custo, só o prejuízo)
+    { tipo: 'venda', data: d, valor: 119.9, origemId: 'api-ml-222-venda', itens: [{ item_id: 'MLB2', quantidade: 1, preco_unitario: 119.9 }] },
+    // Cancelada, mas a reclamação foi encerrada a favor do vendedor: o dinheiro ficou e o produto foi embora
+    { tipo: 'cancelamento', data: d, valor: 389.9, origemId: 'api-ml-333-cancelamento', itens: [{ item_id: 'MLB3', quantidade: 1, preco_unitario: 389.9 }] },
+  ];
+  p.state.liberacoes = { cobertura: [['2026-01-01', d]], antecipacao: {}, pedidos: {
+    111: { liquido: 87.31, devolucao: 0, outros: 0 },
+    222: { liquido: 87.46, devolucao: -138.01, outros: 0 },
+    333: { liquido: 298.07, devolucao: 0, outros: 0 },
+  } };
+  const l = Object.fromEntries(p.calcLucroPorProduto(30).linhas.map((g) => [g.itemId, g]));
+  perto(l.MLB1.lucro, 87.31 - 109.9 * 0.04 - 30, 'Gillette');
+  perto(l.MLB2.lucro, -50.55, 'devolvida: só o prejuízo, sem imposto nem custo');
+  perto(l.MLB3.lucro, 298.07 - 389.9 * 0.04 - 100, 'cancelada que ficou');
+});
+
+test('antecipação vem do relatório de liberações quando ele cobre o período', () => {
+  const p = painelBase();
+  p.state.liberacoes = { cobertura: [['2026-07-03', '2099-12-31']], pedidos: {}, antecipacao: { '2026-10-02': 35.39, '2026-10-12': 77.36, '2026-10-15': 249.47, '2026-09-29': 29.93 } };
+  perto(p.antecipacaoNoIntervalo('2026-10-01', '2026-10-18'), 362.22, 'outubro');
+  assert.equal(p.antecipacaoNoIntervalo('2026-06-01', '2026-06-30'), null);
+});

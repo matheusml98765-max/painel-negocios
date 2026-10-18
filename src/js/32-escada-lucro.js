@@ -22,7 +22,7 @@
       if (ini > fim) return;
       var parte = diasEntre(ini, fim) / Math.max(1, diasEntre(p.de, fimReal));
       p.linhas.forEach(function (l) {
-        var k = FATURA_FORA_DA_VENDA[l.categoria];
+        var k = FATURA_FORA_DA_VENDA[l.categoria];  // a antecipacao pode ser trocada pelo valor real em calcEscada
         if (k && l.valor > 0) { r[k] += l.valor * parte; r.temDados = true; }
         // Bonificacao do Product Ads (credito do ML): abate do Ads do ML
         if (l.valor < 0 && (l.codigo === 'BPAD' || /publicidade|product ads/i.test(l.descricao || ''))) { r.adsMl += l.valor * parte; r.bonusAds += -l.valor * parte; }
@@ -44,6 +44,9 @@
     var adsSp = 0;
     ((state.adsShopee && state.adsShopee.dias) || []).forEach(function (d) { if (d.data >= de && d.data <= ate) adsSp += Number(d.gasto) || 0; });
     var fat = faturaNoIntervalo(de, ate);
+    // Antecipacao cobrada de verdade (relatorio de liberacoes) em vez da fatura repartida pelos dias
+    var antReal = typeof antecipacaoNoIntervalo === 'function' ? antecipacaoNoIntervalo(de, ate) : null;
+    if (antReal !== null) { fat.antecipacao = antReal; fat.antecipacaoReal = true; }
     var lucroReal = t.lucro - adsSp - fat.adsMl - fat.antecipacao - fat.full - fat.outros;
 
     // Contas do mes do fim do intervalo: fixas da loja x investimentos (o DAS ja esta no imposto)
@@ -80,13 +83,14 @@
     card.appendChild(degrau('Lucro da operação', t.lucro, 'o que os produtos deixaram' + pct(t.lucro), 'subtotal'));
     card.appendChild(degrau('Ads da Shopee', e.adsShopee, '', 'menos'));
     card.appendChild(degrau('Ads do Mercado Livre', e.fatura.adsMl, 'da fatura do ML' + (e.fatura.bonusAds >= 0.5 ? ', já tirando ' + fmtMoney(e.fatura.bonusAds) + ' que o ML devolveu de bonificação' : ''), 'menos'));
-    card.appendChild(degrau('Antecipação do Mercado Pago', e.fatura.antecipacao, 'para receber antes do prazo', 'menos'));
+    card.appendChild(degrau('Antecipação do Mercado Pago', e.fatura.antecipacao, e.fatura.antecipacaoReal ? 'o que o Mercado Pago cobrou de verdade nesses dias' : 'para receber antes do prazo (fatura repartida pelos dias)', 'menos'));
     card.appendChild(degrau('Full e outras cobranças', e.fatura.full + e.fatura.outros, 'armazenagem do Full e outras cobranças da fatura', 'menos'));
     card.appendChild(degrau('Lucro real', e.lucroReal, 'o que a loja gerou de verdade' + pct(e.lucroReal), 'destaque ' + (e.lucroReal >= 0 ? 'pos' : 'neg')));
     card.appendChild(degrau('Contas fixas da loja', e.fixas, e.listaFixas.map(function (i) { return i.nome; }).join(', ') || 'nenhuma lançada', 'menos'));
     card.appendChild(degrau('Sobrou no bolso', e.bolso, '', 'destaque ' + (e.bolso >= 0 ? 'pos' : 'neg')));
     if (e.invest) card.appendChild(el('p', { class: 'pml-note', text: 'Investimentos no mês (fora da conta, porque viram patrimônio): ' + e.listaInvest.map(function (i) { return i.nome + ' ' + fmtMoney(i.valor); }).join(' · ') + ' = ' + fmtMoney(e.invest) + '.' }));
     var notas = [];
+    if (state.liberacoes && state.liberacoes.pedidos) notas.push('Vendas do ML já liberadas usam o que caiu na sua conta (relatório de liberações do Mercado Pago), com devoluções e frete devolvido.');
     if (t.semCusto) notas.push(t.semCusto + ' produto(s) sem custo cadastrado (' + fmtMoney(t.receitaSemCusto) + ' em vendas) ficaram fora do lucro.');
     if (!e.fatura.temDados) notas.push('A fatura do ML deste período ainda não chegou: Ads do ML, antecipação e Full podem estar faltando.');
     else notas.push('Cobranças da fatura do ML entram proporcionais aos dias do período.');
