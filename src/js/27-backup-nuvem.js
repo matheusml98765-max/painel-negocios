@@ -16,9 +16,18 @@
   function montarCopia() {
     var dados = { tipo: 'backup-painel-top-brasil-shop', versao: 2, criadoEm: new Date().toISOString(), chaves: {} };
     CHAVES_NUVEM.forEach(function (k) { try { var v = localStorage.getItem('pml_' + k); if (v !== null) dados.chaves[k] = v; } catch (e) {} });
+    dados.resumo = resumoParaTelegram();
     return dados;
   }
-  function assinatura(d) { return JSON.stringify(d.chaves); }
+  // Lucro de hoje e do mes, para o comando /lucro do Telegram (a automacao nao tem os custos)
+  function resumoParaTelegram() {
+    try {
+      var hoje = isoHoje(0), d = calcVendasDoDia(hoje), e = calcEscada(hoje.slice(0, 8) + '01', hoje);
+      return { dia: hoje, hoje: { vendas: d.vendas.length, bruto: round2(d.bruto), lucro: round2(d.lucro), semCusto: d.semCusto },
+        mes: { vendeu: round2(e.t.receita), operacao: round2(e.t.lucro), real: round2(e.lucroReal), bolso: round2(e.bolso) } };
+    } catch (err) { return null; }
+  }
+  function assinatura(d) { return JSON.stringify(d.chaves) + JSON.stringify(d.resumo); }
 
   async function salvarNaNuvem(forcar) {
     var tk = tokenGist(), id = idDoGist(state.gistUrl);
