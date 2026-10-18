@@ -335,6 +335,7 @@ test('escada do lucro: operação, lucro real (Ads, antecipação, Full) e bolso
   // fatura de 30 dias (21/08 a 19/09), 19 deles dentro de setembro => 19/30 de cada cobrança fora da venda
   p.state.faturamento = { periodos: [{ de: '2026-08-21', ate: '2026-09-19', linhas: [
     { categoria: 'Antecipação', valor: 30 }, { categoria: 'Publicidade', valor: 15 }, { categoria: 'Full', valor: 9 },
+    { categoria: 'Estornos e bonificações', codigo: 'BPAD', descricao: 'Bonificação campanhas de publicidade - Product Ads', valor: -6 },
     { categoria: 'Comissões', valor: 500 }, { categoria: 'Parcelamento', valor: 300 } ] }] };
   p.state.contasRemotas = { contas: [
     { id: 'f1', tipo: 'fixa', nome: 'Contador', valor: 10, dia: 20, de: 'empresa', categoria: 'Serviços' },
@@ -344,10 +345,10 @@ test('escada do lucro: operação, lucro real (Ads, antecipação, Full) e bolso
   perto(e.t.lucro, 80 - 4 - 20, 'lucro da operação');
   perto(e.adsShopee, 6, 'Ads Shopee do período');
   perto(e.fatura.antecipacao, 19, 'antecipação proporcional');
-  perto(e.fatura.adsMl, 9.5, 'Ads ML proporcional'); perto(e.fatura.full, 5.7, 'Full proporcional');
-  perto(e.lucroReal, 56 - 6 - 9.5 - 19 - 5.7, 'lucro real (comissão e parcelamento da fatura não contam de novo)');
+  perto(e.fatura.adsMl, 9.5 - 3.8, 'Ads ML menos a bonificação'); perto(e.fatura.full, 5.7, 'Full proporcional');
+  perto(e.lucroReal, 56 - 6 - 5.7 - 19 - 5.7, 'lucro real (comissão e parcelamento da fatura não contam de novo)');
   perto(e.fixas, 10, 'só contas fixas da loja'); perto(e.invest, 50, 'impressora é investimento');
-  perto(e.bolso, 15.8 - 10, 'sobrou no bolso');
+  perto(e.bolso, 19.6 - 10, 'sobrou no bolso');
 });
 
 test('kits: taxa fixa por pedido dividida entre as unidades', () => {

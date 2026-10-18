@@ -12,7 +12,7 @@
 
   // Cobrancas da fatura do ML que nao vem em cada venda, proporcionais aos dias do intervalo
   function faturaNoIntervalo(de, ate) {
-    var r = { antecipacao: 0, adsMl: 0, full: 0, outros: 0, temDados: false };
+    var r = { antecipacao: 0, adsMl: 0, bonusAds: 0, full: 0, outros: 0, temDados: false };
     var fat = state.faturamento, hoje = isoHoje(0);
     if (!fat || !Array.isArray(fat.periodos)) return r;
     fat.periodos.forEach(function (p) {
@@ -24,6 +24,8 @@
       p.linhas.forEach(function (l) {
         var k = FATURA_FORA_DA_VENDA[l.categoria];
         if (k && l.valor > 0) { r[k] += l.valor * parte; r.temDados = true; }
+        // Bonificacao do Product Ads (credito do ML): abate do Ads do ML
+        if (l.valor < 0 && (l.codigo === 'BPAD' || /publicidade|product ads/i.test(l.descricao || ''))) { r.adsMl += l.valor * parte; r.bonusAds += -l.valor * parte; }
       });
     });
     return r;
@@ -77,7 +79,7 @@
     if (Math.abs(e.outrosVenda) >= 0.5) card.appendChild(degrau('Devoluções e falhas de impressão', e.outrosVenda, 'tarifas de devolução e peças perdidas', 'menos'));
     card.appendChild(degrau('Lucro da operação', t.lucro, 'o que os produtos deixaram' + pct(t.lucro), 'subtotal'));
     card.appendChild(degrau('Ads da Shopee', e.adsShopee, '', 'menos'));
-    card.appendChild(degrau('Ads do Mercado Livre', e.fatura.adsMl, 'da fatura do ML', 'menos'));
+    card.appendChild(degrau('Ads do Mercado Livre', e.fatura.adsMl, 'da fatura do ML' + (e.fatura.bonusAds >= 0.5 ? ', já tirando ' + fmtMoney(e.fatura.bonusAds) + ' que o ML devolveu de bonificação' : ''), 'menos'));
     card.appendChild(degrau('Antecipação do Mercado Pago', e.fatura.antecipacao, 'para receber antes do prazo', 'menos'));
     card.appendChild(degrau('Full e outras cobranças', e.fatura.full + e.fatura.outros, 'armazenagem do Full e outras cobranças da fatura', 'menos'));
     card.appendChild(degrau('Lucro real', e.lucroReal, 'o que a loja gerou de verdade' + pct(e.lucroReal), 'destaque ' + (e.lucroReal >= 0 ? 'pos' : 'neg')));
