@@ -436,3 +436,21 @@ test('preço logo acima de R$ 79: simula a R$ 78,90', () => {
   assert.equal(f.lista.length, 1);
   perto(f.lista[0].ganho, (24.19 - 6.95) - (81 - 78.9) * (1 - 11.34 / 81), 'ganho por venda');
 });
+
+test('plano de impressão reparte as horas entre as peças pela urgência', () => {
+  const p = painelBase();
+  const d = hoje();
+  const c = p.getCalc3d();
+  c.impressoras = [{ id: 'a', watts: 100 }];
+  c.produtos = [{ id: 'x', nome: 'Papel', horas: 4, porPlaca: 1, anuncios: 'MLB1' }, { id: 'y', nome: 'Secador', horas: 2, porPlaca: 1, anuncios: 'MLB2' }];
+  c.estoquePecas = { x: 0, y: 10 };
+  p.state.calc3d = c;
+  p.state.transacoes = [
+    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB1', quantidade: 28 }] },
+    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB2', quantidade: 28 }] },
+  ];
+  const pl = p.calcPlanoImpressao();
+  assert.equal(pl.lista[0].nome, 'Papel', 'sem estoque vem primeiro');
+  assert.ok(pl.lista[0].hojePlacas > 0 && pl.lista[1].hojePlacas > 0, 'as duas peças entram no dia');
+  assert.ok(pl.usadas <= pl.capacidade);
+});

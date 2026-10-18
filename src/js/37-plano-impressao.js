@@ -22,12 +22,17 @@
       return { id: p.id, nome: p.nome, ritmo: ritmo, estoque: tem, duraDias: ritmo ? tem / ritmo : 99, precisa: precisa,
         placas: placas, horas: placas * hPlaca, porPlaca: porPlaca, hPlaca: hPlaca };
     }).sort(function (a, b) { return a.duraDias - b.duraDias; });
-    // Hoje: enche as horas das impressoras pela ordem de urgencia
-    var livre = capacidade;
-    lista.forEach(function (x) {
-      var cabe = x.hPlaca > 0 ? Math.min(x.placas, Math.floor(livre / x.hPlaca)) : 0;
-      x.hojePlacas = cabe; x.hojePecas = cabe * x.porPlaca; livre -= cabe * x.hPlaca;
-    });
+    // Hoje: reparte as horas das impressoras uma placa por vez, pela ordem de urgencia, para nao
+    // gastar o dia todo numa peca so e deixar faltar as outras.
+    var livre = capacidade, mudou = true;
+    lista.forEach(function (x) { x.hojePlacas = 0; });
+    while (mudou) {
+      mudou = false;
+      lista.forEach(function (x) {
+        if (x.hojePlacas < x.placas && x.hPlaca > 0 && x.hPlaca <= livre) { x.hojePlacas++; livre -= x.hPlaca; mudou = true; }
+      });
+    }
+    lista.forEach(function (x) { x.hojePecas = x.hojePlacas * x.porPlaca; x.informado = Object.prototype.hasOwnProperty.call(estoque, x.id); });
     return { lista: lista, capacidade: capacidade, usadas: capacidade - livre, impressoras: nImp };
   }
 
@@ -45,7 +50,7 @@
       } });
       t.appendChild(el('tr', {}, [el('td', { text: x.nome }), el('td', { class: 'num', text: (Math.round(x.ritmo * 10) / 10).toLocaleString('pt-BR') }),
         el('td', { class: 'num' }, [inp]),
-        el('td', { class: 'num', style: x.duraDias < 3 ? 'color:var(--bad); font-weight:700;' : '', text: x.duraDias >= 99 ? '—' : Math.floor(x.duraDias) + ' dia(s)' }),
+        el('td', { class: 'num', style: x.informado && x.duraDias < 3 ? 'color:var(--bad); font-weight:700;' : '', text: !x.informado ? 'informe' : x.duraDias >= 99 ? '—' : Math.floor(x.duraDias) + ' dia(s)' }),
         el('td', { class: 'num', style: 'font-weight:700;', text: x.hojePecas ? x.hojePecas + ' peça(s) · ' + x.hojePlacas + ' placa(s) · ' + (Math.round(x.hojePlacas * x.hPlaca * 10) / 10).toLocaleString('pt-BR') + ' h' : (x.precisa ? 'amanhã' : 'tem estoque') })]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
