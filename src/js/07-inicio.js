@@ -73,6 +73,9 @@
     var escWrap = el('section', { class: 'ini-bloco ini-c12' });
     renderEscadaCard(escWrap, isoHoje(0).slice(0, 8) + '01', isoHoje(0), 'Este mês: do faturamento ao seu bolso');
     grid.appendChild(escWrap);
+    var caixaWrap = el('section', { class: 'ini-bloco ini-c12' });
+    renderCaixaCard(caixaWrap);
+    grid.appendChild(caixaWrap);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });

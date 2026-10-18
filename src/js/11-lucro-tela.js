@@ -137,7 +137,9 @@
     card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads aparece por produto logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
+    renderRankingCard(wrap, dias, plat);
     renderAdsPorProduto(wrap, plat);
+    if (plat !== 'shopee') { renderFaixaPrecoCard(wrap); renderAuditoriaCard(wrap); }
     if (plat !== 'ml') renderKitsCard(wrap);
     renderDevolucoesCard(wrap, dias);
     renderFaturaCard(wrap);

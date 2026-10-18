@@ -1506,6 +1506,7 @@
           existente.custosShopee = item.custos_shopee;
           mudou = true;
         }
+        if (item.status && existente.status !== item.status) { existente.status = item.status; mudou = true; }
         if (temHora && existente.hora === undefined) {
           existente.hora = quando.getHours(); existente.dow = quando.getDay(); existente.dataHora = quando.toISOString();
           mudou = true;
@@ -1521,6 +1522,7 @@
       if ((tipo === 'venda' || tipo === 'cancelamento') && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
       }
+      if (item.status) transacaoNova.status = item.status;   // Shopee: pedido concluido ou nao (previsao de caixa)
       if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }
       if (tipo === 'venda' && item.custos_ml) {
         transacaoNova.custosMl = item.custos_ml;
@@ -1854,6 +1856,9 @@
     var escWrap = el('section', { class: 'ini-bloco ini-c12' });
     renderEscadaCard(escWrap, isoHoje(0).slice(0, 8) + '01', isoHoje(0), 'Este mês: do faturamento ao seu bolso');
     grid.appendChild(escWrap);
+    var caixaWrap = el('section', { class: 'ini-bloco ini-c12' });
+    renderCaixaCard(caixaWrap);
+    grid.appendChild(caixaWrap);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });
@@ -2125,6 +2130,7 @@
   }
 
   function renderCalc3dTab(wrap) {
+    renderPlanoImpressaoCard(wrap);
     var c = getCalc3d();
     function salvarERender() { salvarCalc3d(); render(); }
     function campo(label, input, dica) {
@@ -2625,7 +2631,9 @@
     card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads aparece por produto logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
+    renderRankingCard(wrap, dias, plat);
     renderAdsPorProduto(wrap, plat);
+    if (plat !== 'shopee') { renderFaixaPrecoCard(wrap); renderAuditoriaCard(wrap); }
     if (plat !== 'ml') renderKitsCard(wrap);
     renderDevolucoesCard(wrap, dias);
     renderFaturaCard(wrap);
@@ -4276,6 +4284,7 @@
     ])]));
     prox.appendChild(el('p', { class: 'pml-note', text: 'O imposto dos meses futuros só aparece quando o mês anterior tiver vendas. Contas com ≈ são estimadas.' }));
     wrap.appendChild(prox);
+    renderCaixaCard(wrap);
 
     // Parcelamentos
     var pa = parcelasEmAndamento(mesHoje, D);
@@ -5398,6 +5407,272 @@
     return Object.keys(L.antecipacao).reduce(function (s, d) {
       return d >= de && d <= ate ? s + (Number(L.antecipacao[d]) || 0) : s;
     }, 0);
+  }
+  // ===================== PREVISAO DE CAIXA =====================
+  // Quanto vai ter no dia X: saldo do Mercado Pago (relatorio de liberacoes) + o que ainda vai liberar
+  // (ML: data de liberacao de cada venda; Shopee: pedido nao concluido, ~10 dias depois da compra,
+  // a mediana do relatorio de renda) - contas que vencem (aba Contas, ainda nao pagas).
+
+  var SHOPEE_DIAS_LIBERAR = 10;
+
+  function addDias(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoDia(d); }
+
+  function calcCaixa(dias) {
+    dias = dias || 30;
+    var hoje = isoHoje(0), fim = addDias(hoje, dias - 1);
+    var L = state.liberacoes || {};
+    var saldo = L.saldo ? Number(L.saldo.valor) || 0 : null;
+    var mov = {};   // dia -> { entra, sai, itens: [] }
+    function lanca(dia, valor, nome, tipo) {
+      if (dia < hoje) dia = hoje;            // atrasado: conta para hoje
+      if (dia > fim || !valor) return;
+      var m = mov[dia] || (mov[dia] = { entra: 0, sai: 0, itens: [] });
+      if (tipo === 'entra') m.entra += valor; else m.sai += valor;
+      m.itens.push({ nome: nome, valor: valor, tipo: tipo });
+    }
+    var mlPend = 0, spPend = 0;
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda') return;
+      if (t.custosMl) {
+        var c = t.custosMl;
+        if (!c.libera_em || liberacaoDoPedido(t)) return;          // ja caiu na conta
+        var v = Number(c.liquido_recebido) || 0;
+        if (v <= 0 || c.libera_em < addDias(hoje, -7)) return;      // antigo demais: ja deve ter caido
+        mlPend += v; lanca(c.libera_em, v, 'Mercado Livre', 'entra');
+      } else if (t.custosShopee && /^api-shopee-/.test(t.origemId || '')) {
+        var st = String((t.custosShopee && t.custosShopee.status) || t.status || '');
+        if (st === 'COMPLETED') return;
+        var s = Number(t.custosShopee.liquido_recebido) || 0;
+        if (s <= 0 || t.data < addDias(hoje, -30)) return;
+        spPend += s; lanca(addDias(t.data, SHOPEE_DIAS_LIBERAR), s, 'Shopee', 'entra');
+      }
+    });
+    var contas = [];
+    [hoje.slice(0, 7), somaMes(hoje.slice(0, 7), 1), somaMes(hoje.slice(0, 7), 2)].forEach(function (m) {
+      contasDoMes(m).forEach(function (l) {
+        if (l.pago || l.vence > fim) return;
+        contas.push(l); lanca(l.vence, l.valor, l.nome, 'sai');
+      });
+    });
+    var serie = [], acum = saldo || 0, menor = null, entra = 0, sai = 0;
+    for (var i = 0; i < dias; i++) {
+      var d = addDias(hoje, i), m = mov[d] || { entra: 0, sai: 0, itens: [] };
+      acum += m.entra - m.sai; entra += m.entra; sai += m.sai;
+      var linha = { dia: d, entra: m.entra, sai: m.sai, saldo: acum, itens: m.itens };
+      serie.push(linha);
+      if (!menor || acum < menor.saldo) menor = linha;
+    }
+    return { saldo: saldo, saldoEm: L.saldo ? L.saldo.em : null, entra: entra, sai: sai, final: acum, menor: menor,
+      serie: serie, mlPend: mlPend, spPend: spPend, contas: contas, dias: dias };
+  }
+
+  function renderCaixaCard(wrap) {
+    var c = calcCaixa(30);
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Previsão de caixa: próximos 30 dias' })]);
+    if (c.saldo === null) {
+      card.appendChild(el('p', { class: 'pml-note', text: 'Falta o saldo do Mercado Pago (vem do relatório de liberações da automação). Assim que ele chegar, a previsão aparece aqui.' }));
+      wrap.appendChild(card); return;
+    }
+    var kpis = el('div', { class: 'pml-metrics' });
+    [['Saldo hoje no Mercado Pago', c.saldo, 'em ' + String(c.saldoEm || '').slice(0, 10).split('-').reverse().join('/')],
+      ['Vai entrar', c.entra, 'ML ' + fmtMoney(c.mlPend) + ' · Shopee ' + fmtMoney(c.spPend)],
+      ['Vai sair (contas)', -c.sai, c.contas.length + ' conta(s) a pagar'],
+      ['Saldo em 30 dias', c.final, 'se nada mudar']].forEach(function (k) {
+      kpis.appendChild(el('div', { class: 'pml-metric' }, [el('div', { class: 'pml-metric-label', text: k[0] }),
+        el('div', { class: 'pml-metric-value' + (k[1] < 0 ? ' neg' : ''), text: (k[1] < 0 ? '− ' : '') + fmtMoney(Math.abs(k[1])) }),
+        el('div', { class: 'pml-margin', text: k[2] })]));
+    });
+    card.appendChild(kpis);
+    var m = c.menor;
+    var aviso = m.saldo < 0
+      ? 'Atenção: no dia ' + m.dia.split('-').reverse().slice(0, 2).join('/') + ' o saldo fica em ' + fmtMoney(m.saldo) + '. Se precisar antecipar, antecipe só o que falta, perto desse dia (antecipação custa caro).'
+      : 'O saldo não fica negativo nos próximos 30 dias: não precisa antecipar. O menor saldo é ' + fmtMoney(m.saldo) + ' no dia ' + m.dia.split('-').reverse().slice(0, 2).join('/') + '.';
+    card.appendChild(el('p', { class: 'pml-note', style: 'font-weight:600; color:' + (m.saldo < 0 ? 'var(--bad)' : 'var(--good)'), text: aviso }));
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Dia', 'Entra', 'Sai', 'Saldo previsto', 'O quê'].map(function (h, i) { return el('th', { class: i && i < 4 ? 'num' : '', text: h }); })));
+    c.serie.filter(function (s) { return s.entra || s.sai; }).forEach(function (s) {
+      var oque = {};
+      s.itens.forEach(function (i) { var k = i.tipo === 'entra' ? i.nome : i.nome; oque[k] = (oque[k] || 0) + i.valor; });
+      t.appendChild(el('tr', {}, [
+        el('td', { text: s.dia.split('-').reverse().slice(0, 2).join('/') }),
+        el('td', { class: 'num', style: 'color:var(--good)', text: s.entra ? fmtMoney(s.entra) : '' }),
+        el('td', { class: 'num', style: 'color:var(--bad)', text: s.sai ? fmtMoney(s.sai) : '' }),
+        el('td', { class: 'num', style: 'font-weight:700;' + (s.saldo < 0 ? 'color:var(--bad)' : ''), text: fmtMoney(s.saldo) }),
+        el('td', { class: 'pml-margin', text: Object.keys(oque).map(function (k) { return k + ' ' + fmtMoney(oque[k]); }).join(' · ') })
+      ]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: data de liberação de cada venda, informada pelo Mercado Pago. Shopee: pedido ainda não concluído, previsto para ' + SHOPEE_DIAS_LIBERAR + ' dias depois da compra (o tempo normal nos seus pedidos). Contas: as não pagas da aba Contas, empresa e CPF. O saldo é só o do Mercado Pago; dinheiro no banco não entra.' }));
+    wrap.appendChild(card);
+  }
+  // ===================== AUDITOR, FAIXA DE PRECO E RANKING =====================
+
+  // ---- Auditor de cobrancas (ML): o que devia cair x o que caiu de verdade ----
+  // devia = venda - comissao - frete do vendedor (o "Total recebido" do resumo da venda).
+  // caiu  = relatorio de liberacoes do Mercado Pago (pagamento + frete devolvido), sem devolucoes.
+  function calcAuditoria(dias) {
+    var lim = limiteDias(dias || 60), r = [];
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !t.custosMl || t.data < lim) return;
+      var l = liberacaoDoPedido(t);
+      if (!l || Math.abs(Number(l.devolucao) || 0) > 0.005) return;   // nao liberada ou com devolucao (outra conta)
+      var c = t.custosMl, devia = round2((Number(t.valor) || 0) - (Number(c.comissao) || 0) - (Number(c.frete) || 0));
+      var caiu = round2(Number(l.liquido) || 0), dif = round2(caiu - devia);
+      if (dif < -0.5) r.push({ pedido: pedidoMlDe(t), data: t.data, titulo: ((t.itens || [])[0] || {}).titulo || '', valor: t.valor, devia: devia, caiu: caiu, dif: dif });
+    });
+    r.sort(function (a, b) { return a.dif - b.dif; });
+    return { lista: r, total: r.reduce(function (s, x) { return s + x.dif; }, 0) };
+  }
+
+  function renderAuditoriaCard(wrap) {
+    if (!state.liberacoes || !state.liberacoes.pedidos) return;
+    var a = calcAuditoria(60);
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Auditor de cobranças (Mercado Livre, 60 dias)' })]);
+    if (!a.lista.length) {
+      card.appendChild(el('p', { class: 'pml-note', style: 'color:var(--good); font-weight:600;', text: 'Tudo certo: em todas as vendas liberadas caiu o que o resumo da venda prometia (venda − comissão − frete).' }));
+      wrap.appendChild(card); return;
+    }
+    card.appendChild(el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: a.lista.length + ' venda(s) em que caiu menos do que o prometido, ' + fmtMoney(-a.total) + ' no total. Pode ser parcelamento sem juros pago por você, tarifa extra ou cobrança errada: abra o pedido no ML e, se não tiver explicação, peça revisão.' }));
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Pedido', 'Produto', 'Devia cair', 'Caiu', 'Diferença'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); })));
+    a.lista.slice(0, 15).forEach(function (x) {
+      t.appendChild(el('tr', {}, [el('td', { text: x.pedido + ' · ' + x.data.split('-').reverse().slice(0, 2).join('/') }), el('td', { text: String(x.titulo).slice(0, 40) }),
+        el('td', { class: 'num', text: fmtMoney(x.devia) }), el('td', { class: 'num', text: fmtMoney(x.caiu) }),
+        el('td', { class: 'num', style: 'color:var(--bad); font-weight:700;', text: fmtMoney(x.dif) })]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    wrap.appendChild(card);
+  }
+
+  // ---- Preco na faixa errada (ML): logo acima de R$ 79 voce paga o frete gratis ----
+  var LIMITE_FRETE_ML = 79, PRECO_SUGERIDO = 78.9;
+  function calcFaixaPreco(dias) {
+    var lim = limiteDias(dias || 60), itens = {}, baratos = [];
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !t.custosMl || t.data < lim || !Array.isArray(t.itens) || t.itens.length !== 1) return;
+      var i = t.itens[0], q = Number(i.quantidade) || 1, p = Number(i.preco_unitario) || (t.valor / q);
+      var c = t.custosMl, fr = Number(c.frete) || 0;
+      if (p < LIMITE_FRETE_ML) { baratos.push(fr / q); return; }
+      if (p > 95 || q !== 1) return;
+      var g = itens[i.item_id] || (itens[i.item_id] = { itemId: i.item_id, titulo: i.titulo, n: 0, preco: 0, frete: 0, comissao: 0 });
+      g.n++; g.preco += p; g.frete += fr; g.comissao += Number(c.comissao) || 0;
+    });
+    baratos.sort(function (a, b) { return a - b; });
+    var freteBarato = baratos.length ? baratos[Math.floor(baratos.length / 2)] : 0;
+    var lista = Object.keys(itens).map(function (k) {
+      var g = itens[k], preco = g.preco / g.n, frete = g.frete / g.n, taxa = g.comissao / g.preco;
+      var ganho = (frete - freteBarato) - (preco - PRECO_SUGERIDO) * (1 - taxa);
+      return { itemId: g.itemId, titulo: g.titulo, vendas: g.n, preco: preco, frete: frete, freteBarato: freteBarato, ganho: ganho };
+    }).filter(function (x) { return x.ganho > 0.5 && x.frete >= 8; }).sort(function (a, b) { return b.ganho * b.vendas - a.ganho * a.vendas; });
+    return { lista: lista, freteBarato: freteBarato, amostra: baratos.length };
+  }
+
+  function renderFaixaPrecoCard(wrap) {
+    var f = calcFaixaPreco(60);
+    if (!f.lista.length) return;
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Preço logo acima de R$ 79: o frete grátis sai do seu bolso' }),
+      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'A partir de R$ 79 o ML obriga frete grátis e cobra de você. Abaixo disso, nas suas vendas o frete saiu em média ' + fmtMoney(f.freteBarato) + ' (' + f.amostra + ' vendas). Simulação baixando para ' + fmtMoney(PRECO_SUGERIDO) + ', com a mesma comissão:' })]);
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Produto', 'Vendas (60 d)', 'Preço hoje', 'Frete que você paga', 'Ganho por venda a R$ 78,90'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
+    f.lista.forEach(function (x) {
+      t.appendChild(el('tr', {}, [el('td', { text: String(x.titulo || x.itemId).slice(0, 45) }), el('td', { class: 'num', text: String(x.vendas) }),
+        el('td', { class: 'num', text: fmtMoney(x.preco) }), el('td', { class: 'num', text: fmtMoney(x.frete) }),
+        el('td', { class: 'num', style: 'color:var(--good); font-weight:700;', text: '+' + fmtMoney(x.ganho) + ' (+' + fmtMoney(x.ganho * x.vendas) + ' em 60 d)' })]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    card.appendChild(el('p', { class: 'pml-note', text: 'Abaixo de R$ 79 o comprador passa a pagar parte do frete, então a conversão pode cair um pouco. Teste num anúncio e compare as vendas da semana.' }));
+    wrap.appendChild(card);
+  }
+
+  // ---- Ranking do lucro de verdade por anuncio, com o que fazer ----
+  function calcRanking(dias, plat) {
+    var ads = calcAdsPorProduto(plat || 'todas'), gasto = {};
+    ((ads && ads.linhas) || []).forEach(function (x) { gasto[String(x.itemId).toUpperCase()] = (gasto[String(x.itemId).toUpperCase()] || 0) + x.gasto * (dias / (ads.dias || 30)); });
+    return calcLucroPorProduto(dias, plat || 'todas').linhas.filter(function (g) { return g.lucro !== null && g.unidades > 0; }).map(function (g) {
+      var a = gasto[String(g.itemId).toUpperCase()] || 0, real = g.lucro - a, margem = g.receita ? real / g.receita : 0;
+      var acao;
+      if (real < 0) acao = a > 0 && g.lucro > 0 ? 'baixar Ads' : 'subir preço ou pausar';
+      else if (a > 0 && a > g.lucro * 0.4) acao = 'baixar Ads';
+      else if (margem < 0.08) acao = 'subir preço';
+      else if (margem >= 0.2 && g.unidades >= 5) acao = 'escalar';
+      else acao = 'manter';
+      return { itemId: g.itemId, plataforma: g.plataforma, titulo: g.titulo, unidades: g.unidades, receita: g.receita, lucro: g.lucro, ads: a, real: real, margem: margem, acao: acao };
+    }).sort(function (a, b) { return b.real - a.real; });
+  }
+
+  var COR_ACAO = { 'escalar': 'var(--good)', 'manter': 'var(--muted)', 'subir preço': 'var(--warn)', 'baixar Ads': 'var(--warn)', 'subir preço ou pausar': 'var(--bad)' };
+  function renderRankingCard(wrap, dias, plat) {
+    var r = calcRanking(dias, plat);
+    if (!r.length) return;
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Ranking do lucro de verdade por anúncio (' + dias + ' dias)' }),
+      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Lucro depois de taxas, imposto, custo, devoluções e Ads de cada anúncio. A etiqueta diz o que fazer.' })]);
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Anúncio', 'Vendidos', 'Lucro', 'Ads', 'Lucro real', 'Margem real', 'O que fazer'].map(function (h, i) { return el('th', { class: i && i < 6 ? 'num' : '', text: h }); })));
+    var mostrar = r.length > 16 ? r.slice(0, 10).concat(r.slice(-6)) : r;
+    mostrar.forEach(function (x) {
+      t.appendChild(el('tr', {}, [el('td', { text: (x.plataforma === 'shopee' ? 'Shopee · ' : 'ML · ') + String(x.titulo).slice(0, 40) }),
+        el('td', { class: 'num', text: String(x.unidades) }), el('td', { class: 'num', text: fmtMoney(x.lucro) }),
+        el('td', { class: 'num', text: x.ads ? '− ' + fmtMoney(x.ads) : '—' }),
+        el('td', { class: 'num', style: 'font-weight:700; color:' + (x.real >= 0 ? 'var(--good)' : 'var(--bad)'), text: fmtMoney(x.real) }),
+        el('td', { class: 'num', text: fmtPct(x.margem) }),
+        el('td', { style: 'font-weight:700; color:' + (COR_ACAO[x.acao] || 'inherit'), text: x.acao })]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    card.appendChild(el('p', { class: 'pml-note', text: (r.length > 16 ? 'Mostrando os 10 melhores e os 6 piores de ' + r.length + '. ' : '') + 'Escalar: margem real de 20% ou mais e 5+ vendas (mais estoque, mais Ads). Baixar Ads: o Ads come mais de 40% do lucro. Subir preço: margem real abaixo de 8%. O Ads de cada anúncio é dos últimos 30 dias, proporcional ao período.' }));
+    wrap.appendChild(card);
+  }
+  // ===================== PLANO DE IMPRESSAO DO DIA =====================
+  // Ritmo de vendas de cada peca 3D (ultimos 14 dias) + estoque pronto (o vendedor informa) +
+  // horas das impressoras -> o que imprimir hoje para nao faltar o que mais vende.
+
+  var PLANO_DIAS_COBRIR = 7, PLANO_HORAS_DIA = 20;
+
+  function calcPlanoImpressao() {
+    var c = getCalc3d();
+    var estoque = c.estoquePecas || {};
+    var u = unidadesPorItem(14), porPeca = {};
+    Object.keys(u).forEach(function (id) {
+      var p = pecaDoItem(id);
+      if (p) porPeca[p.id] = (porPeca[p.id] || 0) + u[id];
+    });
+    var nImp = Math.max(1, (c.impressoras || []).length);
+    var capacidade = nImp * PLANO_HORAS_DIA;
+    var lista = (c.produtos || []).filter(function (p) { return num(p.horas) > 0 && porPeca[p.id]; }).map(function (p) {
+      var ritmo = porPeca[p.id] / 14, tem = num(estoque[p.id]);
+      var porPlaca = Math.max(1, num(p.porPlaca) || 1), hPlaca = num(p.horas);
+      var precisa = Math.max(0, Math.ceil(ritmo * PLANO_DIAS_COBRIR - tem));
+      var placas = Math.ceil(precisa / porPlaca);
+      return { id: p.id, nome: p.nome, ritmo: ritmo, estoque: tem, duraDias: ritmo ? tem / ritmo : 99, precisa: precisa,
+        placas: placas, horas: placas * hPlaca, porPlaca: porPlaca, hPlaca: hPlaca };
+    }).sort(function (a, b) { return a.duraDias - b.duraDias; });
+    // Hoje: enche as horas das impressoras pela ordem de urgencia
+    var livre = capacidade;
+    lista.forEach(function (x) {
+      var cabe = x.hPlaca > 0 ? Math.min(x.placas, Math.floor(livre / x.hPlaca)) : 0;
+      x.hojePlacas = cabe; x.hojePecas = cabe * x.porPlaca; livre -= cabe * x.hPlaca;
+    });
+    return { lista: lista, capacidade: capacidade, usadas: capacidade - livre, impressoras: nImp };
+  }
+
+  function renderPlanoImpressaoCard(wrap) {
+    var p = calcPlanoImpressao();
+    if (!p.lista.length) return;
+    var c = getCalc3d();
+    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Plano de impressão de hoje' }),
+      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Pelo ritmo de vendas dos últimos 14 dias, para ter ' + PLANO_DIAS_COBRIR + ' dias de estoque. ' + p.impressoras + ' impressoras × ' + PLANO_HORAS_DIA + ' h = ' + p.capacidade + ' h por dia; o plano usa ' + Math.round(p.usadas) + ' h. Informe quantas peças prontas você tem para o plano ficar certo.' })]);
+    var t = el('table', { class: 'pml-table' });
+    t.appendChild(el('tr', {}, ['Peça', 'Vende por dia', 'Prontas', 'Dura', 'Imprimir hoje'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
+    p.lista.forEach(function (x) {
+      var inp = el('input', { type: 'number', min: '0', step: '1', value: x.estoque || '', style: 'width:70px;', onchange: function () {
+        c.estoquePecas = c.estoquePecas || {}; c.estoquePecas[x.id] = Number(inp.value) || 0; salvarCalc3d(); render();
+      } });
+      t.appendChild(el('tr', {}, [el('td', { text: x.nome }), el('td', { class: 'num', text: (Math.round(x.ritmo * 10) / 10).toLocaleString('pt-BR') }),
+        el('td', { class: 'num' }, [inp]),
+        el('td', { class: 'num', style: x.duraDias < 3 ? 'color:var(--bad); font-weight:700;' : '', text: x.duraDias >= 99 ? '—' : Math.floor(x.duraDias) + ' dia(s)' }),
+        el('td', { class: 'num', style: 'font-weight:700;', text: x.hojePecas ? x.hojePecas + ' peça(s) · ' + x.hojePlacas + ' placa(s) · ' + (Math.round(x.hojePlacas * x.hPlaca * 10) / 10).toLocaleString('pt-BR') + ' h' : (x.precisa ? 'amanhã' : 'tem estoque') })]));
+    });
+    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+    wrap.appendChild(card);
   }
   function render() {
     destruirGraficos();

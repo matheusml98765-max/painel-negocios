@@ -394,3 +394,45 @@ test('antecipação vem do relatório de liberações quando ele cobre o períod
   perto(p.antecipacaoNoIntervalo('2026-10-01', '2026-10-18'), 362.22, 'outubro');
   assert.equal(p.antecipacaoNoIntervalo('2026-06-01', '2026-06-30'), null);
 });
+
+test('previsão de caixa: saldo + liberações do ML + Shopee pendente − contas', () => {
+  const p = painelBase();
+  const d = hoje();
+  const mais = (n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  p.state.liberacoes = { saldo: { em: d + 'T08:00:00', valor: 100 }, pedidos: {}, cobertura: [], antecipacao: {} };
+  p.state.transacoes = [
+    { tipo: 'venda', data: d, valor: 109.9, origemId: 'api-ml-1-venda', itens: [], custosMl: { comissao: 15.39, frete: 7.2, liquido_recebido: 87.31, libera_em: mais(5) } },
+    { tipo: 'venda', data: d, valor: 23.9, origemId: 'api-shopee-A-venda', status: 'SHIPPED', itens: [], custosShopee: { liquido_recebido: 14.13 } },
+  ];
+  p.state.contasRemotas = { contas: [{ id: 'f1', tipo: 'fixa', nome: 'Contador', valor: 300, dia: Number(mais(3).slice(8)), de: 'empresa' }], cartoes: [], pagos: {} };
+  const c = p.calcCaixa(30);
+  perto(c.mlPend, 87.31, 'ML a liberar');
+  perto(c.spPend, 14.13, 'Shopee a liberar');
+  assert.ok(c.sai >= 300, 'conta do contador entra');
+  assert.ok(c.menor.saldo < 0, 'mostra o dia em que fica negativo');
+});
+
+test('auditor acha venda em que caiu menos que venda − comissão − frete', () => {
+  const p = painelBase();
+  const d = hoje();
+  p.state.transacoes = [
+    { tipo: 'venda', data: d, valor: 109.9, origemId: 'api-ml-1-venda', itens: [{ titulo: 'Gillette' }], custosMl: { comissao: 15.39, frete: 7.2 } },
+    { tipo: 'venda', data: d, valor: 59.9, origemId: 'api-ml-2-venda', itens: [{ titulo: 'Listerine' }], custosMl: { comissao: 8.39, frete: 4.2 } },
+  ];
+  p.state.liberacoes = { pedidos: { 1: { liquido: 67.32, devolucao: 0 }, 2: { liquido: 47.31, devolucao: 0 } } };
+  const a = p.calcAuditoria(60);
+  assert.equal(a.lista.length, 1);
+  perto(a.lista[0].dif, -19.99, 'diferença da Gillette');
+});
+
+test('preço logo acima de R$ 79: simula a R$ 78,90', () => {
+  const p = painelBase();
+  const d = hoje();
+  p.state.transacoes = [
+    { tipo: 'venda', data: d, valor: 81, origemId: 'api-ml-1-venda', itens: [{ item_id: 'MLB9', titulo: 'Refil', quantidade: 1, preco_unitario: 81 }], custosMl: { comissao: 11.34, frete: 24.19 } },
+    { tipo: 'venda', data: d, valor: 23.9, origemId: 'api-ml-2-venda', itens: [{ item_id: 'MLB8', quantidade: 1, preco_unitario: 23.9 }], custosMl: { comissao: 3.94, frete: 6.95 } },
+  ];
+  const f = p.calcFaixaPreco(60);
+  assert.equal(f.lista.length, 1);
+  perto(f.lista[0].ganho, (24.19 - 6.95) - (81 - 78.9) * (1 - 11.34 / 81), 'ganho por venda');
+});

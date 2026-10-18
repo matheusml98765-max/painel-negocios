@@ -54,6 +54,7 @@
           existente.custosShopee = item.custos_shopee;
           mudou = true;
         }
+        if (item.status && existente.status !== item.status) { existente.status = item.status; mudou = true; }
         if (temHora && existente.hora === undefined) {
           existente.hora = quando.getHours(); existente.dow = quando.getDay(); existente.dataHora = quando.toISOString();
           mudou = true;
@@ -69,6 +70,7 @@
       if ((tipo === 'venda' || tipo === 'cancelamento') && Array.isArray(item.itens)) {
         transacaoNova.itens = item.itens;
       }
+      if (item.status) transacaoNova.status = item.status;   // Shopee: pedido concluido ou nao (previsao de caixa)
       if (temHora) { transacaoNova.hora = quando.getHours(); transacaoNova.dow = quando.getDay(); transacaoNova.dataHora = quando.toISOString(); }
       if (tipo === 'venda' && item.custos_ml) {
         transacaoNova.custosMl = item.custos_ml;

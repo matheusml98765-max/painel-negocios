@@ -79,6 +79,7 @@
     ])]));
     prox.appendChild(el('p', { class: 'pml-note', text: 'O imposto dos meses futuros só aparece quando o mês anterior tiver vendas. Contas com ≈ são estimadas.' }));
     wrap.appendChild(prox);
+    renderCaixaCard(wrap);
 
     // Parcelamentos
     var pa = parcelasEmAndamento(mesHoje, D);
