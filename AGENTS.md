@@ -32,3 +32,5 @@ O GitHub Actions (`.github/workflows/checar.yml`) roda os dois e a checagem de s
 - Números de dinheiro sempre com `fmtMoney`; porcentagem com `fmtPct`.
 - Mostre só números que vêm de dados reais; quando faltar dado, diga o que falta em vez de mostrar zero ou um valor enganoso.
 - Gráficos com Chart.js (cdnjs). Destrua os gráficos no `render()` (`destruirGraficos`).
+- Bibliotecas externas ficam em `src/inicio.html` com `integrity` (SRI sha384): Chart.js 4.4.1 (cdnjs) e SheetJS/xlsx 0.20.3 (cdn.sheetjs.com, a do npm/cdnjs para em 0.18.5 com falhas conhecidas). Trocou a versão? Recalcule o hash. A auditoria semanal de dependências roda no repositório da automação (`seguranca.yml`).
+- Texto com `html:` passa por `htmlSeguro()` (só b/strong/i/em/br/span/small); dados de fora (títulos, motivos de devolução) vão em `text:`.
