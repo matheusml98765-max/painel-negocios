@@ -71,7 +71,7 @@
     function degrau(rotulo, valor, explica, tipo) {
       return el('div', { class: 'escada-linha ' + (tipo || '') }, [
         el('div', {}, [el('div', { class: 'escada-rotulo', text: rotulo }), explica ? el('div', { class: 'pml-margin', text: explica }) : null].filter(Boolean)),
-        el('div', { class: 'escada-valor', text: (tipo === 'menos' ? '− ' : '') + fmtMoney(Math.abs(valor)) })
+        el('div', { class: 'escada-valor', text: (tipo === 'menos' ? (valor < 0 ? '+ ' : '− ') : (valor < 0 ? '− ' : '')) + fmtMoney(Math.abs(valor)) })
       ]);
     }
     var pct = function (v) { return t.receita ? ' · ' + fmtPct(v / t.receita) + ' do vendido' : ''; };
