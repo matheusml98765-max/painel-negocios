@@ -349,3 +349,17 @@ test('escada do lucro: operação, lucro real (Ads, antecipação, Full) e bolso
   perto(e.fixas, 10, 'só contas fixas da loja'); perto(e.invest, 50, 'impressora é investimento');
   perto(e.bolso, 15.8 - 10, 'sobrou no bolso');
 });
+
+test('kits: taxa fixa por pedido dividida entre as unidades', () => {
+  const p = painelBase();
+  p.state.configLucro.imposto = 4;
+  p.state.custosAvulsos = { '111': 7.69 };
+  // 10 pedidos de 1 unidade a R$ 26,77; taxas = 29,7% + R$ 4,50 por pedido
+  p.state.transacoes = Array.from({ length: 10 }, (_, i) => ({ tipo: 'venda', data: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10), valor: 26.77, origemId: 'api-shopee-' + i,
+    itens: [{ item_id: '111', quantidade: 1, preco_unitario: 26.77 }], custosShopee: { comissao: 26.77 * 0.297, taxa_servico: 4.5, liquido_recebido: 26.77 * (1 - 0.297) - 4.5 } }));
+  const k = p.calcKits(30)[0];
+  perto(k.pct, 0.297, 'taxa percentual real');
+  perto(k.op[0].lucroKit, 26.77 * (1 - 0.297 - 0.04) - 4.5 - 7.69, '1 unidade');
+  perto(k.op[1].lucroKit, 2 * 26.77 * 0.95 * (1 - 0.297 - 0.04) - 4.5 - 2 * 7.69, 'kit de 2 com 5% off');
+  assert.ok(k.op[1].porUnidade > k.op[0].porUnidade, 'kit lucra mais por unidade');
+});
