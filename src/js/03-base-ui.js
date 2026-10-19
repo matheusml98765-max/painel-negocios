@@ -153,7 +153,7 @@
 
   function renderTabs(wrap) {
     var tabs = el('div', { class: 'pml-tabs' });
-    [['dia', 'Meu dia'], ['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['conquistas', 'Conquistas'], ['importar', 'Importar']].forEach(function (t) {
+    [['dia', 'Meu dia'], ['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['calendario', 'Calendário'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['conquistas', 'Conquistas'], ['importar', 'Importar']].forEach(function (t) {
       var btn = el('button', {
         class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
         text: t[1],

@@ -340,3 +340,17 @@
   .escada-linha.destaque .escada-rotulo, .escada-linha.destaque .escada-valor { font-size: 18px; font-weight: 800; }
   .escada-linha.destaque.pos .escada-valor { color: var(--good); }
   .escada-linha.destaque.neg .escada-valor { color: var(--bad); }
+
+  /* Calendario */
+  .cal-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .cal-grade { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); gap: 6px; min-width: 680px; }
+  .cal-sem { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; padding: 4px 0; }
+  .cal-dia { text-align: left; border: 1px solid var(--line); border-radius: 10px; padding: 8px; min-height: 84px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 2px; }
+  .cal-dia:hover { border-color: var(--accent); }
+  .cal-dia.sel { outline: 2px solid var(--accent); }
+  .cal-dia.hoje .cal-num { color: var(--accent); }
+  .cal-dia.futuro { opacity: .35; cursor: default; }
+  .cal-num { font-weight: 700; font-size: 13px; }
+  .cal-vend { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cal-luc { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cal-mg { font-size: 11.5px; color: var(--muted); }

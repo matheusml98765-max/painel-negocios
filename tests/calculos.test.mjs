@@ -465,3 +465,17 @@ test('insumo perdido baixa o estoque e entra no lucro como perda', () => {
   const e = p.calcEscada('2026-10-01', '2026-10-31');
   perto(e.outrosVenda, 120 * 115.6 / 40000, 'perda de 120 cm');
 });
+
+test('calendário soma o mês dia a dia com lucro e margem', () => {
+  const p = painelBase();
+  const d = hoje();
+  p.state.custosAvulsos = { MLB1: 30 };
+  p.state.transacoes = [
+    { tipo: 'venda', data: d, valor: 100, origemId: 'api-ml-1-venda', itens: [{ item_id: 'MLB1', quantidade: 1, preco_unitario: 100, comissao: 10 }], custosMl: { comissao: 10, frete: 5, liquido_recebido: 85 } },
+  ];
+  const c = p.calcCalendario(d.slice(0, 7));
+  const dia = c.dias.find((x) => x.dia === d);
+  perto(dia.lucro, 85 - 4 - 30, 'lucro do dia');
+  perto(dia.margem, (85 - 4 - 30) / 100, 'margem do dia');
+  perto(c.tot.lucro, 51, 'lucro do mês');
+});
