@@ -41,6 +41,9 @@
       t.imposto += g.imposto; t.custo += g.custoTotal; t.lucro += g.lucro;
       outrosVenda += g.liquido - g.imposto - g.custoTotal - g.lucro;   // tarifas de devolucao e falhas
     });
+    // Insumos perdidos fora das vendas
+    var perdas = typeof perdasInsumosNoPeriodo === 'function' ? perdasInsumosNoPeriodo(de, ate).total : 0;
+    t.lucro -= perdas; outrosVenda += perdas;
     var adsSp = 0;
     ((state.adsShopee && state.adsShopee.dias) || []).forEach(function (d) { if (d.data >= de && d.data <= ate) adsSp += Number(d.gasto) || 0; });
     var fat = faturaNoIntervalo(de, ate);
@@ -79,7 +82,7 @@
     card.appendChild(degrau('Comissões, taxas e frete', t.receita - t.liquido, 'o que o ML e a Shopee descontam de cada venda' + pct(t.receita - t.liquido), 'menos'));
     card.appendChild(degrau('Imposto (Simples)', t.imposto, '', 'menos'));
     card.appendChild(degrau('Custo dos produtos', t.custo, 'o que você pagou em cada produto vendido (peças 3D pelo custo real)', 'menos'));
-    if (Math.abs(e.outrosVenda) >= 0.5) card.appendChild(degrau('Devoluções e falhas de impressão', e.outrosVenda, 'tarifas de devolução e peças perdidas', 'menos'));
+    if (Math.abs(e.outrosVenda) >= 0.5) card.appendChild(degrau('Devoluções, falhas e perdas', e.outrosVenda, 'tarifas de devolução, peças que falharam e insumos perdidos', 'menos'));
     card.appendChild(degrau('Lucro da operação', t.lucro, 'o que os produtos deixaram' + pct(t.lucro), 'subtotal'));
     card.appendChild(degrau('Ads da Shopee', e.adsShopee, '', 'menos'));
     card.appendChild(degrau('Ads do Mercado Livre', e.fatura.adsMl, 'da fatura do ML' + (e.fatura.bonusAds >= 0.5 ? ', já tirando ' + fmtMoney(e.fatura.bonusAds) + ' que o ML devolveu de bonificação' : ''), 'menos'));

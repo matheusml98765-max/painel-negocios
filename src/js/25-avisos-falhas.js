@@ -7,11 +7,11 @@
   function dadosProducao() {
     var remoto = state.producaoRemota || lerLocal('ml-producao-remota', null) || {};
     var local = lerLocal('ml-producao-local', { falhas: [], manutencoes: [], excluidos: {}, vistos: {} });
-    ['falhas', 'manutencoes'].forEach(function (k) { if (!local[k]) local[k] = []; });
+    ['falhas', 'manutencoes', 'perdas'].forEach(function (k) { if (!local[k]) local[k] = []; });
     if (!local.excluidos) local.excluidos = {};
     if (!local.vistos) local.vistos = {};
     function juntar(k) { return (remoto[k] || []).concat(local[k]).filter(function (x) { return !local.excluidos[x.id]; }); }
-    return { local: local, falhas: juntar('falhas'), manutencoes: juntar('manutencoes') };
+    return { local: local, falhas: juntar('falhas'), manutencoes: juntar('manutencoes'), perdas: juntar('perdas') };
   }
 
   function pecaPorId(id) { return (getCalc3d().produtos || []).find(function (p) { return p.id === id; }) || null; }
@@ -42,6 +42,20 @@
       r.lista.push({ f: f, c: cf });
     });
     r.lista.sort(function (a, b) { return String(b.f.data).localeCompare(String(a.f.data)); });
+    return r;
+  }
+
+  // Insumos perdidos fora das vendas (plastico rasgado, etiqueta que saiu errada...): producao.json
+  // perdas [{id, data, insumo, qtd}]. Baixam o estoque e entram no lucro pelo preco do lote da epoca.
+  function perdasInsumosNoPeriodo(de, ate) {
+    var r = { total: 0, lista: [] };
+    dadosProducao().perdas.forEach(function (x) {
+      if (!x.data || x.data < de || (ate && x.data > ate)) return;
+      var unit = (typeof precoFifo === 'function' ? precoFifo('emb:' + x.insumo, x.data) : null);
+      if (unit === null || unit === undefined) unit = custoEmbalagem(x.insumo, x.data) || 0;
+      var v = unit * num(x.qtd);
+      r.total += v; r.lista.push({ p: x, valor: v });
+    });
     return r;
   }
 

@@ -454,3 +454,14 @@ test('plano de impressão reparte as horas entre as peças pela urgência', () =
   assert.ok(pl.lista[0].hojePlacas > 0 && pl.lista[1].hojePlacas > 0, 'as duas peças entram no dia');
   assert.ok(pl.usadas <= pl.capacidade);
 });
+
+test('insumo perdido baixa o estoque e entra no lucro como perda', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ nome: 'Plástico bolha (cm)', data: '2026-09-30', qtd: 40000, preco: 115.6, frete: 0 }];
+  c.estoqueInsumos = { 'Plástico bolha (cm)': { qtd: 18000, data: '2026-10-17' } };
+  p.state.calc3d = c;
+  p.state.producaoRemota = { falhas: [], manutencoes: [], perdas: [{ id: 'x1', data: '2026-10-19', insumo: 'Plástico bolha (cm)', qtd: 120 }] };
+  const e = p.calcEscada('2026-10-01', '2026-10-31');
+  perto(e.outrosVenda, 120 * 115.6 / 40000, 'perda de 120 cm');
+});
