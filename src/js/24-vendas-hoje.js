@@ -121,11 +121,18 @@
     grid.appendChild(bloco);
   }
 
-  // Com o painel aberto, busca os dados novos sozinho a cada 10 minutos
+  // Com o painel aberto, busca os dados novos sozinho a cada 10 minutos. A aba escondida nao busca;
+  // quando o vendedor volta para ela (ex.: painel aberto desde a manha), busca na hora se passou de 5 min.
+  var ultimaBuscaAuto = Date.now();
+  function buscarSeVelho(minutos) {
+    if (document.visibilityState === 'hidden' || state.sincronizando || state.atualizandoAgora) return;
+    if (Date.now() - ultimaBuscaAuto < minutos * 60 * 1000) return;
+    ultimaBuscaAuto = Date.now();
+    if (state.gistUrl) sincronizarGist(true);
+    if (state.gistUrlShopee) sincronizarGistShopee(true);
+  }
   if (typeof setInterval === 'function' && typeof document !== 'undefined' && document.addEventListener) {
-    setInterval(function () {
-      if (document.visibilityState === 'hidden' || state.sincronizando || state.atualizandoAgora) return;
-      if (state.gistUrl) sincronizarGist(true);
-      if (state.gistUrlShopee) sincronizarGistShopee(true);
-    }, 10 * 60 * 1000);
+    setInterval(function () { buscarSeVelho(10); }, 60 * 1000);
+    document.addEventListener('visibilitychange', function () { buscarSeVelho(5); });
+    if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('focus', function () { buscarSeVelho(5); });
   }
