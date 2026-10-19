@@ -91,11 +91,15 @@
     if (state.pedirTokenAtualizar) bloco.appendChild(blocoTokenAtualizar());
 
     var lucroDia = r.lucro - (r.ads && r.semCusto < r.vendas.length ? r.ads : 0);
+    // Margem sobre o faturamento: lucro / vendido, so das vendas que ja tem lucro calculado
+    var brutoComLucro = r.vendas.reduce(function (s, v) { return s + (v.lucro !== null ? v.valor : 0); }, 0);
+    var margemDia = brutoComLucro > 0 ? lucroDia / brutoComLucro : null;
     bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
       metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas')),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
-      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg')
+      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
+      metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
     ]));
     if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + (dia === hoje ? 'hoje' : 'ontem') + ' até a última atualização.' })); grid.appendChild(bloco); return; }
     var t = el('table', { class: 'pml-table' });

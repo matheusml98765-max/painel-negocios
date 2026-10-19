@@ -63,7 +63,7 @@
       el('h1', { text: saudacao(agora) + ', ' + NOME_DONO + '!' }),
       el('p', { class: 'dia-data', text: dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1) }),
       el('p', { class: 'dia-frase', text: fraseDoDia() }),
-      v.vendas.length ? el('p', { class: 'pml-margin', text: 'Ontem: ' + v.vendas.length + ' vendas, ' + fmtMoney(v.bruto) + (v.comLucro ? ' · lucro ' + fmtMoney(v.lucro - (v.ads || 0)) : '') }) : null
+      v.vendas.length ? el('p', { class: 'pml-margin', text: 'Ontem: ' + v.vendas.length + ' vendas, ' + fmtMoney(v.bruto) + (v.comLucro ? ' · lucro ' + fmtMoney(v.lucro - (v.ads || 0)) + (function () { var b = v.vendas.reduce(function (s, x) { return s + (x.lucro !== null ? x.valor : 0); }, 0); return b > 0 ? ' · margem ' + fmtPct((v.lucro - (v.ads || 0)) / b) : ''; })() : '') }) : null
     ].filter(Boolean)));
 
     if (total) {

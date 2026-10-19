@@ -23,7 +23,8 @@
   function resumoParaTelegram() {
     try {
       var hoje = isoHoje(0), d = calcVendasDoDia(hoje), e = calcEscada(hoje.slice(0, 8) + '01', hoje);
-      return { dia: hoje, hoje: { vendas: d.vendas.length, bruto: round2(d.bruto), lucro: round2(d.lucro), semCusto: d.semCusto },
+      var bl = d.vendas.reduce(function (s, x) { return s + (x.lucro !== null ? x.valor : 0); }, 0);
+      return { dia: hoje, hoje: { vendas: d.vendas.length, bruto: round2(d.bruto), lucro: round2(d.lucro), semCusto: d.semCusto, margem: bl > 0 ? round2(d.lucro / bl * 100) : null },
         mes: { vendeu: round2(e.t.receita), operacao: round2(e.t.lucro), real: round2(e.lucroReal), bolso: round2(e.bolso) } };
     } catch (err) { return null; }
   }
