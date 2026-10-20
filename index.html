@@ -4557,16 +4557,18 @@
     // Margem sobre o faturamento: lucro / vendido, so das vendas que ja tem lucro calculado
     var brutoComLucro = r.vendas.reduce(function (s, v) { return s + (v.lucro !== null ? v.valor : 0); }, 0);
     var margemDia = brutoComLucro > 0 ? lucroDia / brutoComLucro : null;
+    var comMg = r.vendas.filter(function (v) { return v.lucro !== null && v.valor; });
+    var margemMedia = comMg.length ? comMg.reduce(function (s, v) { return s + v.lucro / v.valor; }, 0) / comMg.length : null;
     bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
       metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) + (function () { var o = calcVendasDoDia(addDias(dia, -1)).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : dia === ontem ? 'anteontem' : 'o dia anterior') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
       metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
-      metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
+      metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : (margemMedia !== null ? 'média dos produtos ' + fmtPct(margemMedia) + ' · ' : '') + 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
     ]));
     if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + nomeDia + (dia === hoje ? ' até a última atualização.' : '.') })); grid.appendChild(bloco); return; }
     var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, ['Hora', 'Onde', 'Produto', 'Venda', 'Taxas', 'Frete', 'Cai na conta', 'Imposto', 'Custo', 'Lucro'].map(function (h, i) { return el('th', { class: i > 2 ? 'num' : '', text: h }); })));
+    t.appendChild(el('tr', {}, ['Hora', 'Onde', 'Produto', 'Venda', 'Taxas', 'Frete', 'Cai na conta', 'Imposto', 'Custo', 'Lucro', 'Margem'].map(function (h, i) { return el('th', { class: i > 2 ? 'num' : '', text: h }); })));
     r.vendas.forEach(function (v) {
       var hora = v.t.dataHora ? new Date(v.t.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
       var prod = (v.t.itens || []).map(function (i) { return (Number(i.quantidade) > 1 ? i.quantidade + '× ' : '') + (i.titulo || i.item_id); }).join(' + ') || (v.t.descricao || '');
@@ -4580,7 +4582,8 @@
         el('td', { class: 'num', text: v.liquido === null ? '—' : fmtMoney(v.liquido) }),
         el('td', { class: 'num', text: fmtMoney(v.imposto) }),
         el('td', { class: 'num', style: v.faltaCusto.length ? 'color:var(--warn);' : '', text: v.faltaCusto.length ? 'sem custo' : fmtMoney(v.custo) }),
-        el('td', { class: 'num', style: 'font-weight:700; color:' + (v.lucro === null ? 'var(--muted)' : v.lucro >= 0 ? 'var(--good)' : 'var(--bad)'), text: v.lucro === null ? '—' : fmtMoney(v.lucro) })
+        el('td', { class: 'num', style: 'font-weight:700; color:' + (v.lucro === null ? 'var(--muted)' : v.lucro >= 0 ? 'var(--good)' : 'var(--bad)'), text: v.lucro === null ? '—' : fmtMoney(v.lucro) }),
+        el('td', { class: 'num', style: 'font-weight:600; color:' + (v.lucro === null || !v.valor ? 'var(--muted)' : v.lucro >= 0 ? 'var(--good)' : 'var(--bad)'), text: v.lucro === null || !v.valor ? '—' : fmtPct(v.lucro / v.valor) })
       ]));
     });
     bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
