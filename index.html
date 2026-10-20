@@ -3720,11 +3720,21 @@
     c.produtos.forEach(function (p) { (p.insumos || []).forEach(function (s) { if (s.nome && num(s.qtd) > 0) nomes[s.nome] = true; }); });
     Object.keys(nomes).forEach(function (n) { itens.push({ nome: n, chave: 'emb:' + n, fator: 1 }); });
     var ini = isoHoje(-29);
+    // Para prever quando acaba: as vendas dos ultimos 30 dias com a embalagem que cada peca usa HOJE
+    // (se o papel higienico passou a ir em caixa, a previsao ja conta caixa, nao plastico bolha).
+    var usoPrevisto = {}, hojeIso = isoHoje(0);
+    state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data || t.data < ini) return;
+      t.itens.forEach(function (i) {
+        var p = pecaDoItem(i.item_id);
+        if (p) insumosNaData(p, hojeIso).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1); });
+      });
+    });
     return itens.map(function (it) {
       var uso = usoPorDia(it.chave);
       var u30 = Object.keys(uso).reduce(function (s, d) { return s + (d >= ini ? uso[d] : 0); }, 0) / it.fator;
       var cont = c.estoqueInsumos[it.nome];
-      var linha = { nome: it.nome, contado: !!cont, porDia: u30 / 30, semPreco: !lotesFifo(it.chave).length };
+      var linha = { nome: it.nome, contado: !!cont, porDia: (it.chave.indexOf('emb:') === 0 ? usoPrevisto[it.nome] || 0 : u30) / 30, semPreco: !lotesFifo(it.chave).length };
       if (cont) {
         var f = filaFifo(it.chave);
         var usado = Object.keys(uso).reduce(function (s, d) { return s + (d > cont.data ? uso[d] : 0); }, 0) / it.fator;
