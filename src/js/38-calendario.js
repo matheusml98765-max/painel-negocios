@@ -110,3 +110,28 @@
     } else card.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda nesse dia.' }));
     wrap.appendChild(card);
   }
+
+  // Calendario pequeno para escolher um dia (Vendas uma por uma). Dias com venda ganham um ponto.
+  function miniCalendario(sel, mes, aoEscolher, aoMudarMes) {
+    var hoje = isoHoje(0), vendas = {};
+    (state.transacoes || []).forEach(function (t) { if (t.tipo === 'venda' && t.data && t.data.slice(0, 7) === mes) vendas[t.data] = (vendas[t.data] || 0) + (Number(t.valor) || 0); });
+    var max = Math.max.apply(null, Object.keys(vendas).map(function (k) { return vendas[k]; }).concat([1]));
+    var caixa = el('div', { class: 'mini-cal' }, [el('div', { class: 'mini-cal-cab' }, [
+      el('button', { class: 'pml-btn secondary', text: '‹', title: 'Mês anterior', onclick: function () { aoMudarMes(somaMes(mes, -1)); } }),
+      el('strong', { text: NOMES_MES[Number(mes.slice(5, 7)) - 1] + ' ' + mes.slice(0, 4) }),
+      el('button', { class: 'pml-btn secondary', text: '›', title: 'Próximo mês', style: mes >= hoje.slice(0, 7) ? 'opacity:.35;' : '', onclick: function () { if (mes < hoje.slice(0, 7)) aoMudarMes(somaMes(mes, 1)); } })
+    ])]);
+    var g = el('div', { class: 'mini-cal-grade' });
+    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(function (n) { g.appendChild(el('span', { class: 'mini-cal-sem', text: n })); });
+    var primeiro = new Date(mes + '-01T12:00:00').getDay(), ult = new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 0).getDate();
+    for (var i = 0; i < primeiro; i++) g.appendChild(el('span'));
+    for (var d = 1; d <= ult; d++) (function (dia) {
+      var futuro = dia > hoje, v = vendas[dia] || 0;
+      g.appendChild(el('button', { class: 'mini-cal-dia' + (dia === sel ? ' sel' : '') + (dia === hoje ? ' hoje' : '') + (futuro ? ' futuro' : ''),
+        title: v ? fmtMoney(v) + ' vendidos' : 'sem vendas', style: v ? 'background: color-mix(in srgb, var(--accent) ' + Math.round(8 + v / max * 30) + '%, var(--surface));' : '',
+        onclick: function () { if (!futuro) aoEscolher(dia); } }, [el('span', { text: String(Number(dia.slice(8))) })]));
+    })(mes + '-' + String(d).padStart(2, '0'));
+    caixa.appendChild(g);
+    caixa.appendChild(el('div', { class: 'pml-margin', style: 'margin-top:6px;', text: 'Mais forte = vendeu mais. Clique num dia para ver as vendas dele.' }));
+    return caixa;
+  }

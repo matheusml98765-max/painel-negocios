@@ -75,33 +75,36 @@
 
   function renderVendasDoDia(grid) {
     var hoje = isoHoje(0), ontem = isoHoje(-1);
-    var dia = state.diaVendas === ontem ? ontem : hoje;
+    var dia = state.diaVendas && state.diaVendas <= hoje ? state.diaVendas : hoje;
+    var nomeDia = dia === hoje ? 'hoje' : dia === ontem ? 'ontem' : 'de ' + dia.slice(8) + '/' + dia.slice(5, 7) + (dia.slice(0, 4) !== hoje.slice(0, 4) ? '/' + dia.slice(0, 4) : '');
     var r = calcVendasDoDia(dia);
     var bloco = el('section', { class: 'ini-bloco ini-c12' });
     var horas = horasDesdeAtualizacaoAutomacao();
     var quando = state.statusAuto && state.statusAuto.atualizado_em ? new Date(state.statusAuto.atualizado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
     bloco.appendChild(el('div', { class: 'cab' }, [
-      el('h3', { text: 'Vendas ' + (dia === hoje ? 'de hoje' : 'de ontem') + ', uma por uma' }),
+      el('h3', { text: 'Vendas ' + (dia === hoje ? 'de hoje' : dia === ontem ? 'de ontem' : nomeDia) + ', uma por uma' }),
       el('div', { style: 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;' }, [
         el('span', { class: 'pml-margin', text: quando ? 'buscado nas plataformas às ' + quando + (horas !== null && horas < 1.5 ? ' · próxima em até 1 h' : '') : '' }),
-        el('button', { class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;', text: dia === hoje ? 'Ver ontem' : 'Ver hoje', onclick: function () { state.diaVendas = dia === hoje ? ontem : hoje; render(); } }),
+        el('button', { class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;', text: dia === hoje ? 'Ver ontem' : 'Ver hoje', onclick: function () { state.diaVendas = dia === hoje ? ontem : hoje; state.calVendasAberto = false; render(); } }),
+        el('button', { class: 'pml-btn secondary', style: 'padding:5px 10px; font-size:12px;' + (state.calVendasAberto ? ' border-color:var(--accent);' : ''), text: '📅 Outro dia', onclick: function () { state.calVendasAberto = !state.calVendasAberto; state.calVendasMes = dia.slice(0, 7); render(); } }),
         el('button', { class: 'pml-btn', style: 'padding:5px 10px; font-size:12px;' + (state.atualizandoAgora ? ' opacity:.7; cursor:wait;' : ''), text: state.atualizandoAgora ? '⏳ ' + state.atualizandoAgora : '↻ Atualizar agora', onclick: function () { if (!state.atualizandoAgora) atualizarAgora(); } })
       ])
     ]));
     if (state.pedirTokenAtualizar) bloco.appendChild(blocoTokenAtualizar());
+    if (state.calVendasAberto) bloco.appendChild(miniCalendario(dia, state.calVendasMes || dia.slice(0, 7), function (d) { state.diaVendas = d; state.calVendasAberto = false; render(); }, function (m) { state.calVendasMes = m; render(); }));
 
     var lucroDia = r.lucro - (r.ads && r.semCusto < r.vendas.length ? r.ads : 0);
     // Margem sobre o faturamento: lucro / vendido, so das vendas que ja tem lucro calculado
     var brutoComLucro = r.vendas.reduce(function (s, v) { return s + (v.lucro !== null ? v.valor : 0); }, 0);
     var margemDia = brutoComLucro > 0 ? lucroDia / brutoComLucro : null;
     bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
-      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) + (function () { var o = calcVendasDoDia(dia === hoje ? ontem : isoHoje(-2)).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : 'anteontem') : ''; })()),
+      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) + (function () { var o = calcVendasDoDia(addDias(dia, -1)).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : dia === ontem ? 'anteontem' : 'o dia anterior') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
       metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
       metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
     ]));
-    if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + (dia === hoje ? 'hoje' : 'ontem') + ' até a última atualização.' })); grid.appendChild(bloco); return; }
+    if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + nomeDia + (dia === hoje ? ' até a última atualização.' : '.') })); grid.appendChild(bloco); return; }
     var t = el('table', { class: 'pml-table' });
     t.appendChild(el('tr', {}, ['Hora', 'Onde', 'Produto', 'Venda', 'Taxas', 'Frete', 'Cai na conta', 'Imposto', 'Custo', 'Lucro'].map(function (h, i) { return el('th', { class: i > 2 ? 'num' : '', text: h }); })));
     r.vendas.forEach(function (v) {

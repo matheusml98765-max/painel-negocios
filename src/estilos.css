@@ -353,6 +353,16 @@
   .escada-linha.destaque.neg .escada-valor { color: var(--bad); }
 
   /* Calendario */
+  .mini-cal { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin: 8px 0 4px; max-width: 320px; background: var(--surface); }
+  .mini-cal-cab { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .mini-cal-cab .pml-btn { padding: 3px 10px; }
+  .mini-cal-grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .mini-cal-sem { font-size: 11px; color: var(--muted); text-align: center; font-weight: 700; }
+  .mini-cal-dia { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; padding: 6px 0; cursor: pointer; }
+  .mini-cal-dia:hover { border-color: var(--accent); }
+  .mini-cal-dia.sel { outline: 2px solid var(--accent); font-weight: 700; }
+  .mini-cal-dia.hoje { color: var(--accent); font-weight: 700; }
+  .mini-cal-dia.futuro { opacity: .3; cursor: default; }
   .cal-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .cal-grade { display: grid; grid-template-columns: repeat(7, minmax(92px, 1fr)); gap: 6px; min-width: 680px; }
   .cal-sem { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; padding: 4px 0; }
