@@ -65,10 +65,11 @@
       CORES_PECA.forEach(function (cor) {
         var k = b + '|' + cor, ritmo = ((vend[b] || {})[cor] || 0) / 14, informado = Object.prototype.hasOwnProperty.call(est, k);
         // peca que nao vendeu nem foi contada ainda aparece tambem, para poder contar
+        var naImp = num(((c.naImpressora || {})[k] || {}).qtd);
         var tem = est[k] || 0, porPlaca = Math.max(1, num(p.porPlaca) || 1), hPlaca = num(p.horas);
-        var precisa = Math.max(0, Math.ceil(ritmo * PLANO_DIAS_COBRIR - tem));
-        lista.push({ id: k, base: b, cor: cor, nome: b + ' ' + cor, ritmo: ritmo, estoque: tem, informado: informado,
-          duraDias: ritmo ? tem / ritmo : 99, precisa: precisa, placas: Math.ceil(precisa / porPlaca),
+        var precisa = Math.max(0, Math.ceil(ritmo * PLANO_DIAS_COBRIR - tem - naImp));
+        lista.push({ id: k, base: b, cor: cor, nome: b + ' ' + cor, ritmo: ritmo, estoque: tem, naImpressora: naImp, informado: informado,
+          duraDias: ritmo ? (tem + naImp) / ritmo : 99, precisa: precisa, placas: Math.ceil(precisa / porPlaca),
           porPlaca: porPlaca, hPlaca: hPlaca });
       });
     });
@@ -92,14 +93,19 @@
     if (!p.lista.length) return;
     var c = getCalc3d(), inputs = {};
     var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Plano de impressão de hoje' }),
-      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Pelo ritmo de vendas de cada cor nos últimos 14 dias, para ter ' + PLANO_DIAS_COBRIR + ' dias de estoque. ' + p.impressoras + ' impressoras × ' + PLANO_HORAS_DIA + ' h = ' + p.capacidade + ' h por dia; o plano usa ' + Math.round(p.usadas) + ' h. Dupla face e parafuso contam juntos (é a mesma peça impressa).' })]);
+      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Pelo ritmo de vendas de cada cor nos últimos 14 dias, para ter ' + PLANO_DIAS_COBRIR + ' dias de estoque. ' + p.impressoras + ' impressoras × ' + PLANO_HORAS_DIA + ' h = ' + p.capacidade + ' h por dia; o plano usa ' + Math.round(p.usadas) + ' h. Dupla face e parafuso contam juntos (é a mesma peça impressa). O que está na impressora já conta para o estoque; clique em Ficou pronto quando sair.' })]);
     var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, ['Peça', 'Cor', 'Vende por dia', 'Prontas agora', 'Dura', 'Imprimir hoje', 'Nova contagem'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); })));
+    t.appendChild(el('tr', {}, ['Peça', 'Cor', 'Vende por dia', 'Prontas agora', 'Na impressora', 'Dura', 'Imprimir hoje', 'Nova contagem'].map(function (h, i) { return el('th', { class: i > 1 ? 'num' : '', text: h }); })));
     p.lista.forEach(function (x) {
       inputs[x.id] = el('input', { type: 'number', min: '0', step: '1', placeholder: x.informado ? String(x.estoque) : 'quantas', style: 'width:70px;' });
       t.appendChild(el('tr', {}, [el('td', { text: x.base }), el('td', { text: x.cor === 'branco' ? 'Branco' : 'Preto' }),
         el('td', { class: 'num', text: (Math.round(x.ritmo * 10) / 10).toLocaleString('pt-BR') }),
         el('td', { class: 'num', text: x.informado ? String(x.estoque) : '—' }),
+        el('td', { class: 'num' }, x.naImpressora ? [el('span', { text: x.naImpressora + ' ' }), el('button', { class: 'pml-btn secondary', style: 'padding:3px 8px; font-size:12px;', text: 'Ficou pronto', title: 'Passa para as prontas', onclick: function () {
+          c.estoquePecas = c.estoquePecas || {}; c.estoquePecas[x.id] = num(c.estoquePecas[x.id]) + x.naImpressora;
+          if (!c.estoquePecasEm) c.estoquePecasEm = new Date().toISOString();
+          delete c.naImpressora[x.id]; salvarCalc3d(); render();
+        } })] : [el('span', { class: 'pml-margin', text: '—' })]),
         el('td', { class: 'num', style: x.informado && x.duraDias < 3 ? 'color:var(--bad); font-weight:700;' : '', text: !x.informado ? 'conte' : x.duraDias >= 99 ? '—' : Math.floor(x.duraDias) + ' dia(s)' }),
         el('td', { class: 'num', style: 'font-weight:700;', text: x.hojePecas ? x.hojePecas + ' peça(s) · ' + (Math.round(x.hojePlacas * x.hPlaca * 10) / 10).toLocaleString('pt-BR') + ' h' : (x.precisa ? 'amanhã' : 'tem estoque') }),
         el('td', { class: 'num' }, [inputs[x.id]])]));

@@ -541,3 +541,18 @@ test('calculadora 3D: taxas pelas vendas parecidas e o que cai no bolso', () => 
   assert.ok(p.lucroNaPlataforma('ml', p30, custo.total, false).margem >= 0.3 - 1e-6, 'no preço achado a margem chega a 30%');
   assert.ok(p.lucroNaPlataforma('ml', p30 - 0.05, custo.total, false).margem < 0.3, 'e é o menor preço que chega');
 });
+
+test('peça na impressora entra na conta do que falta imprimir', () => {
+  const p = painelBase();
+  const d = hoje();
+  const c = p.getCalc3d();
+  c.impressoras = [{ id: 'a', watts: 100 }];
+  c.produtos = [{ id: 'x', nome: 'Secador', horas: 2, porPlaca: 1, anuncios: 'MLB1' }];
+  c.estoquePecas = { 'Secador|preto': 2 };
+  c.estoquePecasEm = '2000-01-01T00:00:00.000Z';
+  c.naImpressora = { 'Secador|preto': { qtd: 8 } };
+  p.state.calc3d = c;
+  p.state.transacoes = [{ tipo: 'venda', data: d, dataHora: '1999-01-01T00:00:00.000Z', valor: 20, itens: [{ item_id: 'MLB1', titulo: 'Secador Preto', quantidade: 28 }] }];
+  const x = p.calcPlanoImpressao().lista.find((l) => l.cor === 'preto');
+  assert.equal(x.precisa, 4, '14 para 7 dias − 2 prontas − 8 na impressora');
+});
