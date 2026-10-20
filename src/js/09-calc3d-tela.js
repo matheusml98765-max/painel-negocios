@@ -114,7 +114,9 @@
         campo('Anúncios (ML ou Shopee)', inputTxt(p, 'anuncios', 'MLB123, 22894922420'))
       ]));
       var ins = el('div', { style: 'margin:6px 0 4px;' }, [el('div', { class: 'pml-metric-label', style: 'margin-bottom:6px;', text: 'Embalagem e insumos usados por peça' })]);
+      var antigos = p.insumos.filter(function (it) { return it.ate && it.ate < isoHoje(0); });
       p.insumos.forEach(function (it) {
+        if (antigos.indexOf(it) !== -1) return;   // insumo que a peca deixou de usar: vale so para as vendas antigas
         var nomesSel = nomesEmbalagem().indexOf(it.nome) >= 0 ? nomesEmbalagem() : [it.nome].concat(nomesEmbalagem());
         var semPreco = nomesEmbalagem().indexOf(it.nome) < 0;
         var sel = el('select', { style: 'padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field); font-family:inherit;' }, nomesSel.map(function (n) { var o = el('option', { value: n, text: n }); if (it.nome === n) o.setAttribute('selected', ''); return o; }));
@@ -127,6 +129,7 @@
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));
       });
+      if (antigos.length) ins.appendChild(el('div', { class: 'pml-margin', style: 'margin-bottom:6px;', text: 'Usava antes: ' + antigos.map(function (it) { return it.nome + ' × ' + it.qtd + ' (até ' + it.ate.split('-').reverse().join('/') + ')'; }).join(', ') + '. Continua valendo para as vendas até essa data.' }));
       if (nomesEmbalagem().length) {
         ins.appendChild(el('button', { class: 'pml-btn secondary', style: 'color:var(--good);', text: '+ insumo', onclick: function () { p.insumos.push({ nome: nomesEmbalagem()[0], qtd: 1 }); salvarERender(); } }));
       } else {

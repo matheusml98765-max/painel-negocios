@@ -513,3 +513,14 @@ test('horas das impressoras: diferença entre duas leituras do contador', () => 
   assert.equal(h.realTotal, 210);
   perto(h.luzReal, 210 * 0.1, 'luz real');
 });
+
+test('troca de embalagem com data não mexe no custo das vendas antigas', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ nome: 'Bolha', data: '2026-01-01', qtd: 100, preco: 10, frete: 0 }, { nome: 'Caixa', data: '2026-01-01', qtd: 10, preco: 8, frete: 0 }];
+  const peca = { id: 'x', nome: 'Papel', horas: 0, gramas: 0, porPlaca: 1, insumos: [{ nome: 'Bolha', qtd: 10, ate: '2026-10-19' }, { nome: 'Caixa', qtd: 1, desde: '2026-10-20' }] };
+  c.produtos = [peca];
+  p.state.calc3d = c;
+  perto(p.custoPeca3d(peca, '2026-10-01').embalagem, 1, 'antes: bolha');
+  perto(p.custoPeca3d(peca, '2026-10-21').embalagem, 0.8, 'depois: caixa');
+});

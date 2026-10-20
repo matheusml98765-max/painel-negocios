@@ -2118,6 +2118,13 @@
     return Object.keys(t);
   }
 
+  // Insumos que a peca usava na data (um insumo pode ter desde/ate quando a embalagem mudou,
+  // para a troca nao mexer no custo nem no estoque das vendas antigas).
+  function insumosNaData(p, data) {
+    var d = data || isoHoje(0);
+    return (p.insumos || []).filter(function (s) { return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate); });
+  }
+
   function custoPeca3d(p, dataRef) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
@@ -2129,7 +2136,7 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var emb = insumosNaData(p, dataRef).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -2265,7 +2272,9 @@
         campo('Anúncios (ML ou Shopee)', inputTxt(p, 'anuncios', 'MLB123, 22894922420'))
       ]));
       var ins = el('div', { style: 'margin:6px 0 4px;' }, [el('div', { class: 'pml-metric-label', style: 'margin-bottom:6px;', text: 'Embalagem e insumos usados por peça' })]);
+      var antigos = p.insumos.filter(function (it) { return it.ate && it.ate < isoHoje(0); });
       p.insumos.forEach(function (it) {
+        if (antigos.indexOf(it) !== -1) return;   // insumo que a peca deixou de usar: vale so para as vendas antigas
         var nomesSel = nomesEmbalagem().indexOf(it.nome) >= 0 ? nomesEmbalagem() : [it.nome].concat(nomesEmbalagem());
         var semPreco = nomesEmbalagem().indexOf(it.nome) < 0;
         var sel = el('select', { style: 'padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field); font-family:inherit;' }, nomesSel.map(function (n) { var o = el('option', { value: n, text: n }); if (it.nome === n) o.setAttribute('selected', ''); return o; }));
@@ -2278,6 +2287,7 @@
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));
       });
+      if (antigos.length) ins.appendChild(el('div', { class: 'pml-margin', style: 'margin-bottom:6px;', text: 'Usava antes: ' + antigos.map(function (it) { return it.nome + ' × ' + it.qtd + ' (até ' + it.ate.split('-').reverse().join('/') + ')'; }).join(', ') + '. Continua valendo para as vendas até essa data.' }));
       if (nomesEmbalagem().length) {
         ins.appendChild(el('button', { class: 'pml-btn secondary', style: 'color:var(--good);', text: '+ insumo', onclick: function () { p.insumos.push({ nome: nomesEmbalagem()[0], qtd: 1 }); salvarERender(); } }));
       } else {
@@ -3684,7 +3694,7 @@
         var e = r.pecas[p.id] || (r.pecas[p.id] = { nome: p.nome, unidades: 0, horas: 0, gramas: 0, kwh: 0 });
         e.unidades += qtd; e.horas += h; e.gramas += num(p.gramas) / porPlaca * qtd * perda; e.kwh += kwh;
         r.unidades += qtd; r.horas += h; r.gramas += num(p.gramas) / porPlaca * qtd * perda; r.kwh += kwh;
-        (p.insumos || []).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
+        insumosNaData(p, t.data).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
       });
     });
     if (typeof falhasNoPeriodo === 'function') {
@@ -4392,7 +4402,7 @@
         if (chave.indexOf('fil:') === 0) {
           if ((p.tipo || '').toUpperCase() === chave.slice(4)) g = num(p.gramas) / Math.max(1, num(p.porPlaca) || 1) * q * perda;
         } else {
-          (p.insumos || []).forEach(function (s) { if (s.nome === chave.slice(4)) g += num(s.qtd) * q; });
+          insumosNaData(p, t.data).forEach(function (s) { if (s.nome === chave.slice(4)) g += num(s.qtd) * q; });
         }
         if (g > 0) uso[t.data] = (uso[t.data] || 0) + g;
       });

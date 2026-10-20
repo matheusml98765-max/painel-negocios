@@ -96,6 +96,13 @@
     return Object.keys(t);
   }
 
+  // Insumos que a peca usava na data (um insumo pode ter desde/ate quando a embalagem mudou,
+  // para a troca nao mexer no custo nem no estoque das vendas antigas).
+  function insumosNaData(p, data) {
+    var d = data || isoHoje(0);
+    return (p.insumos || []).filter(function (s) { return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate); });
+  }
+
   function custoPeca3d(p, dataRef) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
@@ -107,7 +114,7 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = (p.insumos || []).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var emb = insumosNaData(p, dataRef).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
