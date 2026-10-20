@@ -453,7 +453,7 @@ test('plano de impressão reparte as horas entre as peças pela urgência', () =
     { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB3', variacao: 'Preto,Parafuso', quantidade: 2 }] },
   ];
   const pl = p.calcPlanoImpressao();
-  assert.equal(pl.lista.length, 2, 'dupla face e parafuso viram uma peça só, por cor');
+  assert.equal(new Set(pl.lista.map((x) => x.base)).size, 2, 'dupla face e parafuso viram uma peça só');
   assert.equal(pl.lista[0].nome, 'Papel branco', 'sem estoque vem primeiro');
   const sec = pl.lista.find((x) => x.base === 'Secador');
   assert.equal(sec.estoque, 0, 'as 16 vendas depois da contagem descontam as 10 prontas');

@@ -5734,7 +5734,7 @@
       var p = bases[b];
       CORES_PECA.forEach(function (cor) {
         var k = b + '|' + cor, ritmo = ((vend[b] || {})[cor] || 0) / 14, informado = Object.prototype.hasOwnProperty.call(est, k);
-        if (!ritmo && !informado) return;
+        // peca que nao vendeu nem foi contada ainda aparece tambem, para poder contar
         var tem = est[k] || 0, porPlaca = Math.max(1, num(p.porPlaca) || 1), hPlaca = num(p.horas);
         var precisa = Math.max(0, Math.ceil(ritmo * PLANO_DIAS_COBRIR - tem));
         lista.push({ id: k, base: b, cor: cor, nome: b + ' ' + cor, ritmo: ritmo, estoque: tem, informado: informado,
