@@ -1,5 +1,6 @@
   function renderCalc3dTab(wrap) {
     renderPlanoImpressaoCard(wrap);
+    renderHorasImpressorasCard(wrap);
     var c = getCalc3d();
     function salvarERender() { salvarCalc3d(); render(); }
     function campo(label, input, dica) {

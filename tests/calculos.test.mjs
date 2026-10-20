@@ -479,3 +479,15 @@ test('calendário soma o mês dia a dia com lucro e margem', () => {
   perto(dia.margem, (85 - 4 - 30) / 100, 'margem do dia');
   perto(c.tot.lucro, 51, 'lucro do mês');
 });
+
+test('horas das impressoras: diferença entre duas leituras do contador', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.kwh = 1;
+  c.impressoras = [{ id: 'a', nome: 'A1', watts: 100 }, { id: 'b', nome: 'A1 b', watts: 100 }];
+  c.leiturasHoras = [{ data: '2026-10-01', valores: { a: 1000, b: 500 } }, { data: '2026-10-11', valores: { a: 1150, b: 560 } }];
+  p.state.calc3d = c;
+  const h = p.calcHorasImpressoras();
+  assert.equal(h.realTotal, 210);
+  perto(h.luzReal, 210 * 0.1, 'luz real');
+});
