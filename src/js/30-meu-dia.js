@@ -35,7 +35,7 @@
       itens.push({ icone: '💸', texto: 'Cobrar ' + x.quem + ': ' + fmtMoney(num(x.valor)) + (x.descricao ? ' (' + x.descricao + ')' : ''), ir: 'receber' });
     });
     calcEstoqueInsumos().filter(function (l) { return l.dias !== undefined && l.dias !== null && l.dias <= 10; }).forEach(function (l) {
-      itens.push({ icone: '🛒', texto: 'Comprar ' + l.nome.replace(/ \((cm|kg)\)$/, '') + ' (acaba em ' + Math.round(l.dias) + ' dias)', ir: 'calc3d' });
+      itens.push({ icone: '🛒', texto: 'Comprar ' + l.nome.replace(/ \((cm|kg)\)$/, '') + ' (acaba em ' + Math.round(l.dias) + ' dias)', ir: 'producao3d' });
     });
     var h = horasDesdeAtualizacaoAutomacao();
     if (h !== null && h > 3) itens.unshift({ icone: '⚠️', texto: 'A automação está parada há ' + Math.round(h) + ' horas', forte: true });

@@ -897,7 +897,7 @@
   var GRUPOS_ABAS = [
     ['Dia a dia', [['dia', 'Meu dia'], ['geral', 'Início'], ['calendario', 'Calendário']]],
     ['Dinheiro', [['lucro', 'Lucro por produto'], ['relatorio', 'Relatório do mês'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['financeiro', 'Financeiro']]],
-    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque']]],
+    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['producao3d', 'Produção 3D'], ['estoque', 'Estoque']]],
     ['Organização', [['tarefas', 'Tarefas'], ['conquistas', 'Conquistas'], ['importar', 'Importar e backup']]]
   ];
   function renderTabs(wrap) {
@@ -2176,7 +2176,7 @@
     }
     function hoje() { return new Date().toISOString().slice(0, 10); }
 
-    wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: 'Calculadora própria da sua impressão 3D. Cadastre cada <b>remessa</b> de filamento e embalagem com o preço que você pagou — o custo por grama é a média de todas as remessas, então quando o preço muda, o custo das peças acompanha sozinho. As peças ligadas a um anúncio do ML entram direto na aba <b>Lucro real</b>.' }));
+    wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: 'Os dados da sua produção 3D. Cadastre cada <b>remessa</b> de filamento e embalagem com o preço que você pagou — o custo por grama é a média de todas as remessas, então quando o preço muda, o custo das peças acompanha sozinho. As peças ligadas a um anúncio entram direto no lucro das vendas. Para simular preço e lucro de uma peça, use a aba <b>Calculadora 3D</b>.' }));
 
     // ---------- Custos gerais ----------
     var g = el('div', { class: 'pml-card' });
@@ -2306,55 +2306,6 @@
     pc.appendChild(el('button', { class: 'pml-btn', text: '+ Nova peça', onclick: function () { c.produtos.push({ id: uid(), nome: '', tipo: tiposFilamento()[0], gramas: '', horas: '', porPlaca: 1, impressoraId: (c.impressoras[0] || {}).id, insumos: [], precos: {}, extras: 0, anuncios: '' }); salvarERender(); } }));
     wrap.appendChild(pc);
 
-    // ---------- Simulador por plataforma ----------
-    if (c.produtos.length) {
-      var sim = el('div', { class: 'pml-card' });
-      sim.appendChild(el('p', { class: 'pml-section-title', text: '5. Preço e lucro em cada plataforma' }));
-      sim.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 12px;', text: 'Cada plataforma cobra diferente. Ajuste as taxas se mudarem — os valores iniciais são os públicos de 2026 e o Ads da Shopee é o seu gasto real do último mês (15,5% das vendas).' }));
-      sim.appendChild(el('div', { class: 'pml-form-grid', style: 'max-width:220px;' }, [campo('Imposto (% da venda)', inputNum(c, 'imposto', '0.5'))]));
-
-      c.plataformas.forEach(function (pl) {
-        var bloco = el('div', { style: 'border-top:1px solid var(--surface-2); padding-top:14px; margin-top:14px;' });
-        bloco.appendChild(el('p', { style: 'font-size:15px; font-weight:700; margin:0 0 4px;', text: pl.nome }));
-        if (pl.nota) bloco.appendChild(el('p', { class: 'pml-margin', style: 'margin:0 0 10px;', text: pl.nota }));
-        bloco.appendChild(el('div', { class: 'pml-form-grid' }, [
-          campo('Comissão (%)', inputNum(pl, 'comissao', '0.5')),
-          campo('Taxa fixa por item (R$)', inputNum(pl, 'taxaFixa', '0.5')),
-          campo('Frete que você paga (R$)', inputNum(pl, 'frete', '0.5')),
-          campo('Ads (% das vendas)', inputNum(pl, 'ads', '0.5'))
-        ]));
-        var pct = (num(pl.comissao) + num(c.imposto) + num(pl.ads)) / 100;
-        var fixo = num(pl.taxaFixa) + num(pl.frete);
-        function precoPara(custo, margem) { var d = 1 - pct - margem; return d > 0 ? (custo + fixo) / d : null; }
-        var t = el('table', { class: 'pml-table' });
-        t.appendChild(el('tr', {}, ['Peça', 'Custo', 'Empata em', 'Preço p/ 20%', 'Preço p/ 30%', 'Seu preço', 'Lucro', 'Margem'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
-        c.produtos.forEach(function (p) {
-          var custo = custoPeca3d(p).total;
-          var pronta = num(p.gramas) > 0 && num(p.horas) > 0;
-          if (!pronta) {
-            t.appendChild(el('tr', {}, [el('td', { text: p.nome || '(sem nome)' }), el('td', { colspan: '7', class: 'pml-margin', text: 'Preencha gramas e horas desta peça (seção 4) para calcular.' })]));
-            return;
-          }
-          var precoInp = el('input', { class: 'pml-custo-input', type: 'number', step: '0.01', value: p.precos[pl.id] || '', placeholder: 'R$' });
-          precoInp.addEventListener('change', function () { p.precos[pl.id] = num(precoInp.value) || ''; salvarERender(); });
-          var pv = num(p.precos[pl.id]);
-          var lucro = pv ? pv * (1 - pct) - fixo - custo : null;
-          t.appendChild(el('tr', { class: lucro !== null && lucro < 0 ? 'pml-row-alerta' : (lucro !== null && lucro / pv < 0.1 ? 'pml-row-atencao' : '') }, [
-            el('td', { text: p.nome || '(sem nome)' }),
-            el('td', { class: 'num', text: fmtMoney(custo) }),
-            el('td', { class: 'num', text: precoPara(custo, 0) ? fmtMoney(precoPara(custo, 0)) : '—' }),
-            el('td', { class: 'num', text: precoPara(custo, 0.2) ? fmtMoney(precoPara(custo, 0.2)) : '—' }),
-            el('td', { class: 'num', text: precoPara(custo, 0.3) ? fmtMoney(precoPara(custo, 0.3)) : '—' }),
-            el('td', { class: 'num' }, [precoInp]),
-            el('td', { class: 'num', style: lucro !== null && lucro < 0 ? 'color:var(--bad); font-weight:700;' : 'font-weight:600;', text: lucro === null ? '—' : fmtMoney(lucro) }),
-            el('td', { class: 'num', text: lucro === null ? '—' : fmtPct(lucro / pv) })
-          ]));
-        });
-        bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-        sim.appendChild(bloco);
-      });
-      wrap.appendChild(sim);
-    }
     renderLuzInsumosCards(wrap);
     renderFalhasCard(wrap);
     renderComprasCard(wrap);
@@ -4805,7 +4756,7 @@
     if (!falhasHoje && !visto('falha')) av.push({ k: 'falha', icone: '🖨️', texto: 'Teve alguma falha de impressão hoje?', acao: 'falha' });
     var c = getCalc3d();
     var comprasHoje = c.filamentos.concat(c.embalagens).filter(function (l) { return l.data === hoje; }).length;
-    if (!comprasHoje && !visto('compra')) av.push({ k: 'compra', icone: '📦', texto: 'Comprou filamento ou insumo hoje? Cadastre com o preço que pagou.', ir: 'calc3d', botao: 'Cadastrar compra' });
+    if (!comprasHoje && !visto('compra')) av.push({ k: 'compra', icone: '📦', texto: 'Comprou filamento ou insumo hoje? Cadastre com o preço que pagou.', ir: 'producao3d', botao: 'Cadastrar compra' });
     var cpf = lancamentosCpf().todos.filter(function (l) { return l.data === hoje; });
     if (!cpf.some(function (l) { return l.categoria !== 'Da empresa para o CPF'; }) && !visto('cpf')) av.push({ k: 'cpf', icone: '💳', texto: 'Gastou ou recebeu algo no seu CPF hoje?', ir: 'cpf', botao: 'Lançar no CPF' });
     if (!cpf.some(function (l) { return l.categoria === 'Da empresa para o CPF'; }) && !visto('retirada')) av.push({ k: 'retirada', icone: '🔁', texto: 'Passou dinheiro da loja para o seu CPF hoje?', ir: 'cpf', botao: 'Lançar' });
@@ -4823,11 +4774,11 @@
     // Insumos
     var ins = calcEstoqueInsumos();
     var acabando = ins.filter(function (l) { return l.dias !== undefined && l.dias !== null && l.dias <= 10; });
-    if (acabando.length) av.push({ k: 'acabando', icone: '🛒', texto: 'Hora de comprar: ' + acabando.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, '') + ' (' + Math.round(l.dias) + ' dias)'; }).join(', '), ir: 'calc3d', botao: 'Ver estoque', forte: true, fixo: true });
+    if (acabando.length) av.push({ k: 'acabando', icone: '🛒', texto: 'Hora de comprar: ' + acabando.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, '') + ' (' + Math.round(l.dias) + ' dias)'; }).join(', '), ir: 'producao3d', botao: 'Ver estoque', forte: true, fixo: true });
     var semConta = ins.filter(function (l) { return !l.contado; });
-    if (semConta.length && !visto('contar')) av.push({ k: 'contar', icone: '🔢', texto: semConta.length + ' insumo(s) ainda sem contagem de estoque: ' + semConta.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).slice(0, 5).join(', ') + (semConta.length > 5 ? '...' : ''), ir: 'calc3d', botao: 'Contar' });
+    if (semConta.length && !visto('contar')) av.push({ k: 'contar', icone: '🔢', texto: semConta.length + ' insumo(s) ainda sem contagem de estoque: ' + semConta.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).slice(0, 5).join(', ') + (semConta.length > 5 ? '...' : ''), ir: 'producao3d', botao: 'Contar' });
     var semPreco = ins.filter(function (l) { return l.semPreco; });
-    if (semPreco.length && !visto('preco')) av.push({ k: 'preco', icone: '🏷️', texto: 'Falta o preço de: ' + semPreco.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).join(', ') + '. Sem ele o custo da peça fica menor do que é.', ir: 'calc3d', botao: 'Cadastrar' });
+    if (semPreco.length && !visto('preco')) av.push({ k: 'preco', icone: '🏷️', texto: 'Falta o preço de: ' + semPreco.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).join(', ') + '. Sem ele o custo da peça fica menor do que é.', ir: 'producao3d', botao: 'Cadastrar' });
     // Vendas sem custo (7 dias)
     var semCusto = {};
     (state.transacoes || []).forEach(function (t) {
@@ -5180,7 +5131,7 @@
       itens.push({ icone: '💸', texto: 'Cobrar ' + x.quem + ': ' + fmtMoney(num(x.valor)) + (x.descricao ? ' (' + x.descricao + ')' : ''), ir: 'receber' });
     });
     calcEstoqueInsumos().filter(function (l) { return l.dias !== undefined && l.dias !== null && l.dias <= 10; }).forEach(function (l) {
-      itens.push({ icone: '🛒', texto: 'Comprar ' + l.nome.replace(/ \((cm|kg)\)$/, '') + ' (acaba em ' + Math.round(l.dias) + ' dias)', ir: 'calc3d' });
+      itens.push({ icone: '🛒', texto: 'Comprar ' + l.nome.replace(/ \((cm|kg)\)$/, '') + ' (acaba em ' + Math.round(l.dias) + ' dias)', ir: 'producao3d' });
     });
     var h = horasDesdeAtualizacaoAutomacao();
     if (h !== null && h > 3) itens.unshift({ icone: '⚠️', texto: 'A automação está parada há ' + Math.round(h) + ' horas', forte: true });
@@ -5986,10 +5937,157 @@
     if (notas.length) card.appendChild(el('p', { class: 'pml-note', text: notas.join(' ') }));
     wrap.appendChild(card);
   }
+  // ===================== CALCULADORA 3D (SIMPLES) =====================
+  // Uma peça nova ou cadastrada: filamento, tempo, luz e embalagem -> custo; preço de venda ->
+  // o que cai no bolso em cada plataforma. As taxas saem das suas vendas parecidas (mesma
+  // plataforma, preço perto do seu); sem vendas parecidas, usa as taxas públicas cadastradas.
+  // O resto da calculadora antiga (remessas, peças, plano, insumos) fica na aba Produção 3D.
+
+  var CALC_PLATS = ['ml', 'shopee', 'tiktok'];
+
+  // Quanto a plataforma fica de cada venda nesse preço, pelas suas vendas reais dos últimos 90 dias.
+  function taxasPlataforma(plat, preco) {
+    var lim = limiteDias(90), razoes = [];
+    if (preco > 0) state.transacoes.forEach(function (t) {
+      if (t.tipo !== 'venda' || t.data < lim || !Array.isArray(t.itens) || t.itens.length !== 1 || (Number(t.itens[0].quantidade) || 1) !== 1) return;
+      var cu = plat === 'ml' ? t.custosMl : plat === 'shopee' ? t.custosShopee : null;
+      var v = Number(t.valor) || 0, liq = cu && Number(cu.liquido_recebido);
+      if (!cu || !v || !(liq > 0) || v < preco * 0.65 || v > preco * 1.5) return;
+      if (plat === 'ml' && (v < LIMITE_FRETE_ML) !== (preco < LIMITE_FRETE_ML)) return;   // frete grátis muda tudo
+      razoes.push((v - liq) / v);
+    });
+    if (razoes.length >= 3) {
+      razoes.sort(function (a, b) { return a - b; });
+      var r = razoes[Math.floor(razoes.length / 2)];
+      return { valor: preco * r, pct: r, fonte: 'real', amostra: razoes.length };
+    }
+    var cfg = (getCalc3d().plataformas || []).find(function (p) { return p.id === plat; }) || {};
+    var v2 = preco * num(cfg.comissao) / 100 + num(cfg.taxaFixa) + num(cfg.frete);
+    return { valor: v2, pct: preco ? v2 / preco : 0, fonte: 'tabela', amostra: razoes.length };
+  }
+
+  function adsPctPlataforma(plat) {
+    var cfg = (getCalc3d().plataformas || []).find(function (p) { return p.id === plat; }) || {};
+    return num(cfg.ads) / 100;
+  }
+
+  function custoCalcSimples(e) {
+    var fil = num(e.gramas) * (1 + num(e.perda) / 100) * num(e.precoKg) / 1000;
+    var luz = num(e.horas) * num(e.watts) / 1000 * num(e.kwh);
+    return { filamento: fil, luz: luz, embalagem: num(e.embalagem), outros: num(e.outros), total: fil + luz + num(e.embalagem) + num(e.outros) };
+  }
+
+  function lucroNaPlataforma(plat, preco, custo, comAds) {
+    var tx = taxasPlataforma(plat, preco), imp = preco * num(state.configLucro.imposto) / 100;
+    var ads = comAds ? preco * adsPctPlataforma(plat) : 0;
+    var lucro = preco - tx.valor - imp - ads - custo;
+    return { plat: plat, preco: preco, taxas: tx, imposto: imp, ads: ads, custo: custo, lucro: lucro, margem: preco ? lucro / preco : null };
+  }
+
+  // Menor preço que deixa essa margem. A taxa muda com o preço (e no ML pula no R$ 79), então
+  // procura subindo o preço de 1% em 1% e depois afina entre os dois últimos.
+  function precoParaMargem(plat, custo, margem, comAds) {
+    function ok(p) { var r = lucroNaPlataforma(plat, p, custo, comAds); return r.lucro >= margem * p - 0.001; }
+    var p = Math.max(1, custo), ant = null;
+    for (var i = 0; i < 400 && p < 5000; i++) {
+      if (ok(p)) {
+        var lo = ant || p / 1.01, hi = p;
+        for (var k = 0; k < 30; k++) { var m = (lo + hi) / 2; if (ok(m)) hi = m; else lo = m; }
+        return Math.ceil(hi * 100) / 100;
+      }
+      ant = p; p *= 1.01;
+    }
+    return null;
+  }
+
+  function entradaCalcPadrao() {
+    var c = getCalc3d(), imp = (c.impressoras || [])[0] || {};
+    return { pecaId: '', gramas: '', horas: '', precoKg: Math.round(custoGrama(tiposFilamento()[0]) * 1000 * 100) / 100 || '', perda: num(c.perdaPct),
+      watts: num(imp.watts) || 100, kwh: num(c.kwh) || 0.8, embalagem: '', outros: '', preco: '', comAds: true };
+  }
+
+  function renderCalculadoraTab(wrap) {
+    var e = Object.assign(entradaCalcPadrao(), lerLocal('ml-calc-simples', {}));
+    var c = getCalc3d();
+    function guardar() { gravarLocal('ml-calc-simples', e); atualizar(); }
+    function campoNum(rot, chave, passo, dica) {
+      var i = el('input', { type: 'number', step: passo, min: '0', value: e[chave] === '' || e[chave] === undefined ? '' : e[chave] });
+      i.addEventListener('input', function () { e[chave] = i.value === '' ? '' : Number(i.value); guardar(); });
+      return el('div', { class: 'pml-field' }, [el('label', { text: rot }), i, dica ? el('div', { class: 'pml-margin', style: 'margin-top:3px;', text: dica }) : null]);
+    }
+    var sel = el('select', {}, [el('option', { value: '', text: 'Peça nova (preencher à mão)' })].concat((c.produtos || []).filter(function (p) { return num(p.gramas) > 0; }).map(function (p) {
+      var o = el('option', { value: p.id, text: p.nome }); if (e.pecaId === p.id) o.setAttribute('selected', ''); return o;
+    })));
+    sel.addEventListener('change', function () {
+      var p = (c.produtos || []).find(function (x) { return x.id === sel.value; });
+      e.pecaId = sel.value;
+      if (p) {
+        var porPlaca = Math.max(1, num(p.porPlaca) || 1);
+        e.gramas = Math.round(num(p.gramas) / porPlaca * 10) / 10; e.horas = Math.round(num(p.horas) / porPlaca * 100) / 100;
+        e.precoKg = Math.round(custoGrama(p.tipo) * 1000 * 100) / 100;
+        e.embalagem = Math.round(insumosNaData(p).reduce(function (s, i) { return s + custoEmbalagem(i.nome) * num(i.qtd); }, 0) * 100) / 100;
+        e.outros = num(p.extras) || '';
+        var pr = p.precos && (p.precos.ml || p.precos.shopee); if (pr) e.preco = num(pr);
+      }
+      gravarLocal('ml-calc-simples', e); render();
+    });
+    var chk = el('input', { type: 'checkbox' }); chk.checked = e.comAds !== false;
+    chk.addEventListener('change', function () { e.comAds = chk.checked; guardar(); });
+
+    wrap.appendChild(el('div', { class: 'pml-card' }, [
+      el('p', { class: 'pml-section-title', text: 'Calculadora 3D: quanto custa e quanto cai no bolso' }),
+      el('p', { class: 'pml-margin', style: 'margin:0 0 12px;', text: 'Preencha a peça e o preço de venda. Os números já vêm com o seu filamento, a sua luz e as taxas das suas vendas parecidas.' }),
+      el('div', { class: 'pml-form-grid' }, [el('div', { class: 'pml-field' }, [el('label', { text: 'Começar de uma peça sua' }), sel])]),
+      el('p', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: 'A peça' }),
+      el('div', { class: 'pml-form-grid' }, [campoNum('Filamento (gramas)', 'gramas', '1', 'o fatiador mostra'), campoNum('Tempo de impressão (horas)', 'horas', '0.1', 'por peça'),
+        campoNum('Preço do filamento (R$ por kg)', 'precoKg', '0.01', 'média das suas compras'), campoNum('Falhas (% a mais de filamento)', 'perda', '1')]),
+      el('p', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: 'Luz e embalagem' }),
+      el('div', { class: 'pml-form-grid' }, [campoNum('Impressora (watts)', 'watts', '1', 'Bambu A1 ≈ 100 W'), campoNum('Luz (R$ por kWh)', 'kwh', '0.01', 'da conta de luz'),
+        campoNum('Embalagem (R$)', 'embalagem', '0.01', 'caixa, saco, etiqueta, plástico...'), campoNum('Outros (R$)', 'outros', '0.01', 'fita, parafuso, brinde...')]),
+      el('p', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: 'Venda' }),
+      el('div', { class: 'pml-form-grid' }, [campoNum('Preço de venda (R$)', 'preco', '0.01'),
+        el('div', { class: 'pml-field' }, [el('label', { text: 'Ads' }), el('label', { style: 'display:flex; gap:6px; align-items:center; font-weight:400;' }, [chk, el('span', { text: 'Descontar o Ads (Shopee ' + fmtPct(adsPctPlataforma('shopee')) + ' das vendas)' })])])])
+    ]));
+    var res = el('div');
+    wrap.appendChild(res);
+
+    function atualizar() {
+      res.innerHTML = '';
+      var custo = custoCalcSimples(e), preco = num(e.preco);
+      res.appendChild(el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Custo de cada peça: ' + fmtMoney(custo.total) }),
+        el('p', { class: 'pml-margin', style: 'margin:0;', text: 'Filamento ' + fmtMoney(custo.filamento) + ' · luz ' + fmtMoney(custo.luz) + ' · embalagem ' + fmtMoney(custo.embalagem) + (custo.outros ? ' · outros ' + fmtMoney(custo.outros) : '') })]));
+      if (!(custo.total > 0)) return;
+      var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: preco ? 'Vendendo a ' + fmtMoney(preco) : 'Que preço cobrar' })]);
+      var t = el('table', { class: 'pml-table' });
+      var cab = preco ? ['', 'Taxas e frete', 'Imposto', 'Ads', 'Custo da peça', 'Cai no bolso', 'Margem', 'Preço p/ 30%'] : ['', 'Empata em', 'Preço p/ 20%', 'Preço p/ 30%', 'Preço p/ 40%'];
+      t.appendChild(el('tr', {}, cab.map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
+      var fontes = [];
+      CALC_PLATS.forEach(function (pl) {
+        var p30 = precoParaMargem(pl, custo.total, 0.3, e.comAds !== false);
+        if (preco) {
+          var r = lucroNaPlataforma(pl, preco, custo.total, e.comAds !== false);
+          fontes.push(NOMES_PLAT[pl] + ': ' + (r.taxas.fonte === 'real' ? r.taxas.amostra + ' vendas suas parecidas (' + fmtPct(r.taxas.pct) + ')' : 'taxa da tabela (sem vendas parecidas)'));
+          t.appendChild(el('tr', { class: r.lucro < 0 ? 'pml-row-alerta' : '' }, [el('td', { style: 'font-weight:600;', text: NOMES_PLAT[pl] }),
+            el('td', { class: 'num', text: '−' + fmtMoney(r.taxas.valor) }), el('td', { class: 'num', text: '−' + fmtMoney(r.imposto) }),
+            el('td', { class: 'num', text: r.ads ? '−' + fmtMoney(r.ads) : '—' }), el('td', { class: 'num', text: '−' + fmtMoney(custo.total) }),
+            el('td', { class: 'num', style: 'font-weight:700; font-size:15px; color:var(' + (r.lucro < 0 ? '--bad' : '--good') + ');', text: fmtMoney(r.lucro) }),
+            el('td', { class: 'num', text: fmtPct(r.margem) }), el('td', { class: 'num', text: p30 ? fmtMoney(p30) : '—' })]));
+        } else {
+          t.appendChild(el('tr', {}, [el('td', { style: 'font-weight:600;', text: NOMES_PLAT[pl] })].concat([0, 0.2, 0.3, 0.4].map(function (m) {
+            var p = precoParaMargem(pl, custo.total, m, e.comAds !== false); return el('td', { class: 'num', text: p ? fmtMoney(p) : '—' });
+          }))));
+        }
+      });
+      card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
+      card.appendChild(el('p', { class: 'pml-note', text: (preco ? 'Taxas: ' + fontes.join(' · ') + '. ' : 'Digite o preço de venda para ver quanto cai no bolso. ') + 'Imposto do Simples ' + fmtPct(num(state.configLucro.imposto) / 100) + '. No ML, abaixo de R$ 79 o comprador paga parte do frete; acima, o frete grátis sai de você.' }));
+      res.appendChild(card);
+    }
+    atualizar();
+  }
   function render() {
     destruirGraficos();
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'producao3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
     renderHeader(wrap);
     // Menu na esquerda e o conteudo da aba na direita
     var pagina = wrap, layout = el('div', { class: 'pml-layout' }), main = el('main', { class: 'pml-main' });
@@ -6020,6 +6118,8 @@
     } else if (state.tab === 'lucro') {
       renderLucroTab(wrap);
     } else if (state.tab === 'calc3d') {
+      renderCalculadoraTab(wrap);
+    } else if (state.tab === 'producao3d') {
       renderCalc3dTab(wrap);
     } else if (state.tab === 'tarefas') {
       renderTarefasTab(wrap);
@@ -6049,7 +6149,7 @@
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
   var abaDoLink = (location.hash || '').replace('#', '');
-  if (['dia', 'geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
+  if (['dia', 'geral', 'lucro', 'calc3d', 'producao3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   if (!abaDoLink || /[?&]bomdia=1/.test(location.search)) abrirMeuDiaHoje();
   mostrarIntro();

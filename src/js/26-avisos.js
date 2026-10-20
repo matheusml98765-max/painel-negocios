@@ -10,7 +10,7 @@
     if (!falhasHoje && !visto('falha')) av.push({ k: 'falha', icone: '🖨️', texto: 'Teve alguma falha de impressão hoje?', acao: 'falha' });
     var c = getCalc3d();
     var comprasHoje = c.filamentos.concat(c.embalagens).filter(function (l) { return l.data === hoje; }).length;
-    if (!comprasHoje && !visto('compra')) av.push({ k: 'compra', icone: '📦', texto: 'Comprou filamento ou insumo hoje? Cadastre com o preço que pagou.', ir: 'calc3d', botao: 'Cadastrar compra' });
+    if (!comprasHoje && !visto('compra')) av.push({ k: 'compra', icone: '📦', texto: 'Comprou filamento ou insumo hoje? Cadastre com o preço que pagou.', ir: 'producao3d', botao: 'Cadastrar compra' });
     var cpf = lancamentosCpf().todos.filter(function (l) { return l.data === hoje; });
     if (!cpf.some(function (l) { return l.categoria !== 'Da empresa para o CPF'; }) && !visto('cpf')) av.push({ k: 'cpf', icone: '💳', texto: 'Gastou ou recebeu algo no seu CPF hoje?', ir: 'cpf', botao: 'Lançar no CPF' });
     if (!cpf.some(function (l) { return l.categoria === 'Da empresa para o CPF'; }) && !visto('retirada')) av.push({ k: 'retirada', icone: '🔁', texto: 'Passou dinheiro da loja para o seu CPF hoje?', ir: 'cpf', botao: 'Lançar' });
@@ -28,11 +28,11 @@
     // Insumos
     var ins = calcEstoqueInsumos();
     var acabando = ins.filter(function (l) { return l.dias !== undefined && l.dias !== null && l.dias <= 10; });
-    if (acabando.length) av.push({ k: 'acabando', icone: '🛒', texto: 'Hora de comprar: ' + acabando.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, '') + ' (' + Math.round(l.dias) + ' dias)'; }).join(', '), ir: 'calc3d', botao: 'Ver estoque', forte: true, fixo: true });
+    if (acabando.length) av.push({ k: 'acabando', icone: '🛒', texto: 'Hora de comprar: ' + acabando.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, '') + ' (' + Math.round(l.dias) + ' dias)'; }).join(', '), ir: 'producao3d', botao: 'Ver estoque', forte: true, fixo: true });
     var semConta = ins.filter(function (l) { return !l.contado; });
-    if (semConta.length && !visto('contar')) av.push({ k: 'contar', icone: '🔢', texto: semConta.length + ' insumo(s) ainda sem contagem de estoque: ' + semConta.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).slice(0, 5).join(', ') + (semConta.length > 5 ? '...' : ''), ir: 'calc3d', botao: 'Contar' });
+    if (semConta.length && !visto('contar')) av.push({ k: 'contar', icone: '🔢', texto: semConta.length + ' insumo(s) ainda sem contagem de estoque: ' + semConta.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).slice(0, 5).join(', ') + (semConta.length > 5 ? '...' : ''), ir: 'producao3d', botao: 'Contar' });
     var semPreco = ins.filter(function (l) { return l.semPreco; });
-    if (semPreco.length && !visto('preco')) av.push({ k: 'preco', icone: '🏷️', texto: 'Falta o preço de: ' + semPreco.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).join(', ') + '. Sem ele o custo da peça fica menor do que é.', ir: 'calc3d', botao: 'Cadastrar' });
+    if (semPreco.length && !visto('preco')) av.push({ k: 'preco', icone: '🏷️', texto: 'Falta o preço de: ' + semPreco.map(function (l) { return l.nome.replace(/ \((cm|kg)\)$/, ''); }).join(', ') + '. Sem ele o custo da peça fica menor do que é.', ir: 'producao3d', botao: 'Cadastrar' });
     // Vendas sem custo (7 dias)
     var semCusto = {};
     (state.transacoes || []).forEach(function (t) {

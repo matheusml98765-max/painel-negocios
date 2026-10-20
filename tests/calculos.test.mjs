@@ -524,3 +524,20 @@ test('troca de embalagem com data não mexe no custo das vendas antigas', () => 
   perto(p.custoPeca3d(peca, '2026-10-01').embalagem, 1, 'antes: bolha');
   perto(p.custoPeca3d(peca, '2026-10-21').embalagem, 0.8, 'depois: caixa');
 });
+
+test('calculadora 3D: taxas pelas vendas parecidas e o que cai no bolso', () => {
+  const p = painelBase();
+  const d = hoje();
+  p.state.configLucro.imposto = 4;
+  p.state.transacoes = [30, 32, 28].map((v, k) => ({ tipo: 'venda', data: d, valor: v, origemId: 'api-ml-' + k + '-venda', itens: [{ item_id: 'MLB1', quantidade: 1 }], custosMl: { comissao: v * 0.12, frete: 6, liquido_recebido: v * 0.75 } }));
+  const tx = p.taxasPlataforma('ml', 30);
+  assert.equal(tx.fonte, 'real');
+  perto(tx.valor, 7.5, '25% de 30');
+  const custo = p.custoCalcSimples({ gramas: 50, perda: 0, precoKg: 100, horas: 2, watts: 100, kwh: 1, embalagem: 1, outros: 0 });
+  perto(custo.total, 5 + 0.2 + 1, 'filamento + luz + embalagem');
+  const r = p.lucroNaPlataforma('ml', 30, custo.total, false);
+  perto(r.lucro, 30 - 7.5 - 1.2 - 6.2, 'preço − taxas − imposto − custo');
+  const p30 = p.precoParaMargem('ml', custo.total, 0.3, false);
+  assert.ok(p.lucroNaPlataforma('ml', p30, custo.total, false).margem >= 0.3 - 1e-6, 'no preço achado a margem chega a 30%');
+  assert.ok(p.lucroNaPlataforma('ml', p30 - 0.05, custo.total, false).margem < 0.3, 'e é o menor preço que chega');
+});

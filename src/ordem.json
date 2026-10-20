@@ -41,6 +41,7 @@
  "src/js/37-plano-impressao.js",
  "src/js/38-calendario.js",
  "src/js/39-horas-impressoras.js",
+ "src/js/40-calculadora.js",
  "src/js/12-render.js",
  "src/fim.html"
 ]

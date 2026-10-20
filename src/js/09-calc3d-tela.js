@@ -18,7 +18,7 @@
     }
     function hoje() { return new Date().toISOString().slice(0, 10); }
 
-    wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: 'Calculadora própria da sua impressão 3D. Cadastre cada <b>remessa</b> de filamento e embalagem com o preço que você pagou — o custo por grama é a média de todas as remessas, então quando o preço muda, o custo das peças acompanha sozinho. As peças ligadas a um anúncio do ML entram direto na aba <b>Lucro real</b>.' }));
+    wrap.appendChild(el('div', { class: 'pml-dica', style: 'margin:0 0 20px;', html: 'Os dados da sua produção 3D. Cadastre cada <b>remessa</b> de filamento e embalagem com o preço que você pagou — o custo por grama é a média de todas as remessas, então quando o preço muda, o custo das peças acompanha sozinho. As peças ligadas a um anúncio entram direto no lucro das vendas. Para simular preço e lucro de uma peça, use a aba <b>Calculadora 3D</b>.' }));
 
     // ---------- Custos gerais ----------
     var g = el('div', { class: 'pml-card' });
@@ -148,55 +148,6 @@
     pc.appendChild(el('button', { class: 'pml-btn', text: '+ Nova peça', onclick: function () { c.produtos.push({ id: uid(), nome: '', tipo: tiposFilamento()[0], gramas: '', horas: '', porPlaca: 1, impressoraId: (c.impressoras[0] || {}).id, insumos: [], precos: {}, extras: 0, anuncios: '' }); salvarERender(); } }));
     wrap.appendChild(pc);
 
-    // ---------- Simulador por plataforma ----------
-    if (c.produtos.length) {
-      var sim = el('div', { class: 'pml-card' });
-      sim.appendChild(el('p', { class: 'pml-section-title', text: '5. Preço e lucro em cada plataforma' }));
-      sim.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 12px;', text: 'Cada plataforma cobra diferente. Ajuste as taxas se mudarem — os valores iniciais são os públicos de 2026 e o Ads da Shopee é o seu gasto real do último mês (15,5% das vendas).' }));
-      sim.appendChild(el('div', { class: 'pml-form-grid', style: 'max-width:220px;' }, [campo('Imposto (% da venda)', inputNum(c, 'imposto', '0.5'))]));
-
-      c.plataformas.forEach(function (pl) {
-        var bloco = el('div', { style: 'border-top:1px solid var(--surface-2); padding-top:14px; margin-top:14px;' });
-        bloco.appendChild(el('p', { style: 'font-size:15px; font-weight:700; margin:0 0 4px;', text: pl.nome }));
-        if (pl.nota) bloco.appendChild(el('p', { class: 'pml-margin', style: 'margin:0 0 10px;', text: pl.nota }));
-        bloco.appendChild(el('div', { class: 'pml-form-grid' }, [
-          campo('Comissão (%)', inputNum(pl, 'comissao', '0.5')),
-          campo('Taxa fixa por item (R$)', inputNum(pl, 'taxaFixa', '0.5')),
-          campo('Frete que você paga (R$)', inputNum(pl, 'frete', '0.5')),
-          campo('Ads (% das vendas)', inputNum(pl, 'ads', '0.5'))
-        ]));
-        var pct = (num(pl.comissao) + num(c.imposto) + num(pl.ads)) / 100;
-        var fixo = num(pl.taxaFixa) + num(pl.frete);
-        function precoPara(custo, margem) { var d = 1 - pct - margem; return d > 0 ? (custo + fixo) / d : null; }
-        var t = el('table', { class: 'pml-table' });
-        t.appendChild(el('tr', {}, ['Peça', 'Custo', 'Empata em', 'Preço p/ 20%', 'Preço p/ 30%', 'Seu preço', 'Lucro', 'Margem'].map(function (h, i) { return el('th', { class: i ? 'num' : '', text: h }); })));
-        c.produtos.forEach(function (p) {
-          var custo = custoPeca3d(p).total;
-          var pronta = num(p.gramas) > 0 && num(p.horas) > 0;
-          if (!pronta) {
-            t.appendChild(el('tr', {}, [el('td', { text: p.nome || '(sem nome)' }), el('td', { colspan: '7', class: 'pml-margin', text: 'Preencha gramas e horas desta peça (seção 4) para calcular.' })]));
-            return;
-          }
-          var precoInp = el('input', { class: 'pml-custo-input', type: 'number', step: '0.01', value: p.precos[pl.id] || '', placeholder: 'R$' });
-          precoInp.addEventListener('change', function () { p.precos[pl.id] = num(precoInp.value) || ''; salvarERender(); });
-          var pv = num(p.precos[pl.id]);
-          var lucro = pv ? pv * (1 - pct) - fixo - custo : null;
-          t.appendChild(el('tr', { class: lucro !== null && lucro < 0 ? 'pml-row-alerta' : (lucro !== null && lucro / pv < 0.1 ? 'pml-row-atencao' : '') }, [
-            el('td', { text: p.nome || '(sem nome)' }),
-            el('td', { class: 'num', text: fmtMoney(custo) }),
-            el('td', { class: 'num', text: precoPara(custo, 0) ? fmtMoney(precoPara(custo, 0)) : '—' }),
-            el('td', { class: 'num', text: precoPara(custo, 0.2) ? fmtMoney(precoPara(custo, 0.2)) : '—' }),
-            el('td', { class: 'num', text: precoPara(custo, 0.3) ? fmtMoney(precoPara(custo, 0.3)) : '—' }),
-            el('td', { class: 'num' }, [precoInp]),
-            el('td', { class: 'num', style: lucro !== null && lucro < 0 ? 'color:var(--bad); font-weight:700;' : 'font-weight:600;', text: lucro === null ? '—' : fmtMoney(lucro) }),
-            el('td', { class: 'num', text: lucro === null ? '—' : fmtPct(lucro / pv) })
-          ]));
-        });
-        bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-        sim.appendChild(bloco);
-      });
-      wrap.appendChild(sim);
-    }
     renderLuzInsumosCards(wrap);
     renderFalhasCard(wrap);
     renderComprasCard(wrap);

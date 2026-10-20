@@ -155,7 +155,7 @@
   var GRUPOS_ABAS = [
     ['Dia a dia', [['dia', 'Meu dia'], ['geral', 'Início'], ['calendario', 'Calendário']]],
     ['Dinheiro', [['lucro', 'Lucro por produto'], ['relatorio', 'Relatório do mês'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['financeiro', 'Financeiro']]],
-    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque']]],
+    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['producao3d', 'Produção 3D'], ['estoque', 'Estoque']]],
     ['Organização', [['tarefas', 'Tarefas'], ['conquistas', 'Conquistas'], ['importar', 'Importar e backup']]]
   ];
   function renderTabs(wrap) {

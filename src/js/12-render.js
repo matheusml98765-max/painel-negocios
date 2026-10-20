@@ -1,7 +1,7 @@
   function render() {
     destruirGraficos();
     root.innerHTML = '';
-    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
+    var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'producao3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
     renderHeader(wrap);
     // Menu na esquerda e o conteudo da aba na direita
     var pagina = wrap, layout = el('div', { class: 'pml-layout' }), main = el('main', { class: 'pml-main' });
@@ -32,6 +32,8 @@
     } else if (state.tab === 'lucro') {
       renderLucroTab(wrap);
     } else if (state.tab === 'calc3d') {
+      renderCalculadoraTab(wrap);
+    } else if (state.tab === 'producao3d') {
       renderCalc3dTab(wrap);
     } else if (state.tab === 'tarefas') {
       renderTarefasTab(wrap);
@@ -61,7 +63,7 @@
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
   var abaDoLink = (location.hash || '').replace('#', '');
-  if (['dia', 'geral', 'lucro', 'calc3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
+  if (['dia', 'geral', 'lucro', 'calc3d', 'producao3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   if (!abaDoLink || /[?&]bomdia=1/.test(location.search)) abrirMeuDiaHoje();
   mostrarIntro();
