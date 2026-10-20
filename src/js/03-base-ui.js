@@ -151,17 +151,23 @@
     wrap.appendChild(header);
   }
 
+  // Menu lateral (no celular vira uma faixa no topo que rola para o lado), em grupos
+  var GRUPOS_ABAS = [
+    ['Dia a dia', [['dia', 'Meu dia'], ['geral', 'Início'], ['calendario', 'Calendário']]],
+    ['Dinheiro', [['lucro', 'Lucro por produto'], ['relatorio', 'Relatório do mês'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['financeiro', 'Financeiro']]],
+    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque']]],
+    ['Organização', [['tarefas', 'Tarefas'], ['conquistas', 'Conquistas'], ['importar', 'Importar e backup']]]
+  ];
   function renderTabs(wrap) {
-    var tabs = el('div', { class: 'pml-tabs' });
-    [['dia', 'Meu dia'], ['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['calendario', 'Calendário'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['conquistas', 'Conquistas'], ['importar', 'Importar']].forEach(function (t) {
-      var btn = el('button', {
-        class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
-        text: t[1],
-        onclick: function () { state.tab = t[0]; render(); }
+    var nav = el('nav', { class: 'pml-tabs', 'aria-label': 'Abas do painel' });
+    GRUPOS_ABAS.forEach(function (g) {
+      nav.appendChild(el('div', { class: 'pml-tabs-grupo', text: g[0] }));
+      g[1].forEach(function (t) {
+        nav.appendChild(el('button', { class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''), text: t[1],
+          onclick: function () { state.tab = t[0]; render(); try { window.scrollTo(0, 0); } catch (e) {} } }));
       });
-      tabs.appendChild(btn);
     });
-    wrap.appendChild(tabs);
+    wrap.appendChild(nav);
   }
 
   function fonteAtrasada(url, ultimaSync) {

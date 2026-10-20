@@ -95,7 +95,7 @@
     var brutoComLucro = r.vendas.reduce(function (s, v) { return s + (v.lucro !== null ? v.valor : 0); }, 0);
     var margemDia = brutoComLucro > 0 ? lucroDia / brutoComLucro : null;
     bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
-      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas')),
+      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) + (function () { var o = calcVendasDoDia(dia === hoje ? ontem : isoHoje(-2)).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : 'anteontem') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
       metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
@@ -121,7 +121,7 @@
       ]));
     });
     bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-    bloco.appendChild(el('p', { class: 'pml-note', text: 'As vendas chegam pela automação de hora em hora (6h às 23h) ou na hora pelo botão Atualizar agora. Na Shopee, as taxas de um pedido às vezes só aparecem depois que ele é enviado. "Sem custo": cadastre o custo do produto na aba Lucro real ou na Calculadora 3D.' }));
+    bloco.appendChild(el('p', { class: 'pml-note', text: 'As vendas chegam pela automação de hora em hora (6h às 23h) ou na hora pelo botão Atualizar agora. Na Shopee, as taxas de um pedido às vezes só aparecem depois que ele é enviado. "Sem custo": cadastre o custo do produto na aba Lucro por produto ou na Calculadora 3D.' }));
     grid.appendChild(bloco);
   }
 

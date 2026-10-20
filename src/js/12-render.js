@@ -3,10 +3,15 @@
     root.innerHTML = '';
     var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
     renderHeader(wrap);
-    renderTabs(wrap);
+    // Menu na esquerda e o conteudo da aba na direita
+    var pagina = wrap, layout = el('div', { class: 'pml-layout' }), main = el('main', { class: 'pml-main' });
+    renderTabs(layout);
+    layout.appendChild(main);
+    pagina.appendChild(layout);
+    wrap = main;
     if (!state.loaded) {
       wrap.appendChild(el('div', { class: 'pml-empty', text: 'Carregando seu painel...' }));
-      root.appendChild(wrap);
+      root.appendChild(pagina);
       return;
     }
     if (state.errorMsg) {
@@ -51,7 +56,7 @@
       renderImportarTab(wrap);
       renderBackupCard(wrap);
     }
-    root.appendChild(wrap);
+    root.appendChild(pagina);
   }
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)

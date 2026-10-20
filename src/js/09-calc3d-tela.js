@@ -88,7 +88,7 @@
     // ---------- Pecas ----------
     var pc = el('div', { class: 'pml-card' });
     pc.appendChild(el('p', { class: 'pml-section-title', text: '4. Suas peças — custo de cada uma' }));
-    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB do Mercado Livre e o ID do item da Shopee dessa peça para o lucro aparecer na aba Lucro real.' }));
+    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB do Mercado Livre e o ID do item da Shopee dessa peça para o lucro aparecer na aba Lucro por produto.' }));
     c.produtos.forEach(function (p) {
       var custo = custoPeca3d(p);
       var selTipo = el('select', {}, tiposFilamento().map(function (t) { var o = el('option', { value: t, text: t }); if ((p.tipo || '').toUpperCase() === t) o.setAttribute('selected', ''); return o; }));

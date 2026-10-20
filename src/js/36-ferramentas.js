@@ -77,15 +77,19 @@
     wrap.appendChild(card);
   }
 
-  // ---- Ranking do lucro de verdade por anuncio, com o que fazer ----
+  // ---- Lucro de verdade por anuncio (depois do Ads), com o que fazer: colunas da tabela Lucro por produto ----
   function calcRanking(dias, plat) {
-    var ads = calcAdsPorProduto(plat || 'todas'), gasto = {};
-    ((ads && ads.linhas) || []).forEach(function (x) { gasto[String(x.itemId).toUpperCase()] = (gasto[String(x.itemId).toUpperCase()] || 0) + x.gasto * (dias / (ads.dias || 30)); });
+    var ads = calcAdsPorProduto(plat || 'todas'), gasto = {}, decAds = {};
+    ((ads && ads.linhas) || []).forEach(function (x) {
+      var k = String(x.itemId).toUpperCase();
+      gasto[k] = (gasto[k] || 0) + x.gasto * (dias / (ads.dias || 30));
+      decAds[k] = x.decisao;   // a mesma decisao do quadro de Ads (ACOS x margem), para os dois nao se contradizerem
+    });
     return calcLucroPorProduto(dias, plat || 'todas').linhas.filter(function (g) { return g.lucro !== null && g.unidades > 0; }).map(function (g) {
       var a = gasto[String(g.itemId).toUpperCase()] || 0, real = g.lucro - a, margem = g.receita ? real / g.receita : 0;
-      var acao;
+      var acao, dA = decAds[String(g.itemId).toUpperCase()];
       if (real < 0) acao = a > 0 && g.lucro > 0 ? 'baixar Ads' : 'subir preço ou pausar';
-      else if (a > 0 && a > g.lucro * 0.4) acao = 'baixar Ads';
+      else if (a > 0 && dA === 'pausar') acao = 'baixar Ads';
       else if (margem < 0.08) acao = 'subir preço';
       else if (margem >= 0.2 && g.unidades >= 5) acao = 'escalar';
       else acao = 'manter';
@@ -94,23 +98,3 @@
   }
 
   var COR_ACAO = { 'escalar': 'var(--good)', 'manter': 'var(--muted)', 'subir preço': 'var(--warn)', 'baixar Ads': 'var(--warn)', 'subir preço ou pausar': 'var(--bad)' };
-  function renderRankingCard(wrap, dias, plat) {
-    var r = calcRanking(dias, plat);
-    if (!r.length) return;
-    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Ranking do lucro de verdade por anúncio (' + dias + ' dias)' }),
-      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Lucro depois de taxas, imposto, custo, devoluções e Ads de cada anúncio. A etiqueta diz o que fazer.' })]);
-    var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, ['Anúncio', 'Vendidos', 'Lucro', 'Ads', 'Lucro real', 'Margem real', 'O que fazer'].map(function (h, i) { return el('th', { class: i && i < 6 ? 'num' : '', text: h }); })));
-    var mostrar = r.length > 16 ? r.slice(0, 10).concat(r.slice(-6)) : r;
-    mostrar.forEach(function (x) {
-      t.appendChild(el('tr', {}, [el('td', { text: (x.plataforma === 'shopee' ? 'Shopee · ' : 'ML · ') + String(x.titulo).slice(0, 40) }),
-        el('td', { class: 'num', text: String(x.unidades) }), el('td', { class: 'num', text: fmtMoney(x.lucro) }),
-        el('td', { class: 'num', text: x.ads ? '− ' + fmtMoney(x.ads) : '—' }),
-        el('td', { class: 'num', style: 'font-weight:700; color:' + (x.real >= 0 ? 'var(--good)' : 'var(--bad)'), text: fmtMoney(x.real) }),
-        el('td', { class: 'num', text: fmtPct(x.margem) }),
-        el('td', { style: 'font-weight:700; color:' + (COR_ACAO[x.acao] || 'inherit'), text: x.acao })]));
-    });
-    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-    card.appendChild(el('p', { class: 'pml-note', text: (r.length > 16 ? 'Mostrando os 10 melhores e os 6 piores de ' + r.length + '. ' : '') + 'Escalar: margem real de 20% ou mais e 5+ vendas (mais estoque, mais Ads). Baixar Ads: o Ads come mais de 40% do lucro. Subir preço: margem real abaixo de 8%. O Ads de cada anúncio é dos últimos 30 dias, proporcional ao período.' }));
-    wrap.appendChild(card);
-  }

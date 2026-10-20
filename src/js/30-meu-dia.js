@@ -74,17 +74,8 @@
       ]));
     }
 
-    var pend = pendenciasDeHoje();
-    if (pend.length) {
-      var cp = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: '📌 Hoje também' })]);
-      pend.forEach(function (p) {
-        cp.appendChild(el('div', { class: 'aviso' + (p.forte ? ' forte' : '') }, [
-          el('span', { class: 'aviso-icone', text: p.icone }), el('span', { class: 'aviso-texto', text: p.texto }),
-          p.ir ? el('span', { class: 'aviso-acoes' }, [el('button', { class: 'pml-btn secondary', text: 'Ver', onclick: function () { state.tab = p.ir; render(); window.scrollTo(0, 0); } })]) : null
-        ].filter(Boolean)));
-      });
-      wrap.appendChild(cp);
-    }
+    // Avisos do dia (contas, tarefas, compras, falhas, CPF): ficam so aqui, para nao repetir no Inicio
+    renderAvisos(wrap);
 
     if (!secoes.length) {
       wrap.appendChild(el('div', { class: 'pml-card' }, [el('div', { class: 'pml-empty', text: 'Sua rotina ainda não foi montada. Me mande no chat o que você quer fazer todo dia que eu coloco aqui.' })]));

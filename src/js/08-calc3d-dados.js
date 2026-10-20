@@ -3,7 +3,7 @@
   function plataformasPadrao() {
     return [
       { id: 'shopee', nome: 'Shopee', comissao: 20, taxaFixa: 4.5, frete: 0, ads: 15.5, nota: 'Nas suas vendas reais: cerca de 18,6% de comissão + 1,4% de serviço + R$ 4,50 fixos por pedido. Afiliados cobram à parte quando a venda vem deles.' },
-      { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro real.' },
+      { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro por produto.' },
       { id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, frete: 0, ads: 0, nota: 'Abaixo de R$ 50: 10% + R$ 4 por item (desde 15/07/2026).' }
     ];
   }
@@ -116,7 +116,7 @@
     };
   }
 
-  // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro real)
+  // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro por produto)
   function custo3dDoAnuncio(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;

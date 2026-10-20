@@ -26,7 +26,7 @@
     var sau = el('div', { class: 'ini-saudacao' }, [
       el('div', {}, [
         el('h1', { text: saudacao(agora) + ', ' + NOME_DONO }),
-        el('p', { text: dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1) + '. Este é o resumo da ' + NOME_LOJA + '.' })
+        el('p', { text: dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1) + '. Como estão as vendas da ' + NOME_LOJA + ' agora.' })
       ]),
       el('div', { class: 'ini-atualizado' }, [
         el('span', { class: 'ini-pulso' + (horas !== null && horas > 6 ? ' parado' : '') }),
@@ -34,7 +34,6 @@
       ])
     ]);
     wrap.appendChild(sau);
-    renderAvisos(wrap);
 
     var grid = el('div', { class: 'ini-grid' });
 
@@ -53,7 +52,6 @@
         el('div', {}, [el('b', { text: fmtMoney(d.hoje.plat.shopee || 0) }), el('span', { text: 'Shopee' })])
       ])
     ]);
-    grid.appendChild(hojeCard);
 
     // Mes
     var nomeMes = agora.toLocaleDateString('pt-BR', { month: 'long' });
@@ -62,20 +60,13 @@
     }
     var mes = el('div', { class: 'ini-mes' }, [
       kpi('Faturamento de ' + nomeMes, fmtMoney(d.mes.total), d.mes.pedidos + ' pedidos · ticket ' + fmtMoney(d.mes.pedidos ? d.mes.total / d.mes.pedidos : 0)),
-      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro real', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
+      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
       kpi('As plataformas ficaram com', levou === null ? '—' : fmtPct(levou), 'ML ' + fmtPct(ficouMl) + ' · Shopee ' + fmtPct(ficouShopee) + ' das vendas, antes do Ads'),
       kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
-    grid.appendChild(mes);
     var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
     grid.appendChild(blocoMetas(d, lucroMesCalc));
     renderVendasDoDia(grid);
-    var escWrap = el('section', { class: 'ini-bloco ini-c12' });
-    renderEscadaCard(escWrap, isoHoje(0).slice(0, 8) + '01', isoHoje(0), 'Este mês: do faturamento ao seu bolso');
-    grid.appendChild(escWrap);
-    var caixaWrap = el('section', { class: 'ini-bloco ini-c12' });
-    renderCaixaCard(caixaWrap);
-    grid.appendChild(caixaWrap);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });
@@ -120,15 +111,14 @@
     var comLucro = lucro.linhas.filter(function (g) { return g.lucro !== null; }).sort(function (a, b) { return b.lucro - a.lucro; });
     var ranking = comLucro.slice(0, 6).concat(comLucro.filter(function (g) { return g.lucro < 0; }).filter(function (g) { return comLucro.indexOf(g) >= 6; }));
     var blocoRank = el('section', { class: 'ini-bloco ini-c6' });
-    blocoRank.appendChild(el('div', { class: 'cab' }, [el('h3', { text: 'Quem mais dá lucro (30 dias)' }), el('button', { class: 'ini-ver-tabela', text: 'Abrir Lucro real', onclick: function () { state.tab = 'lucro'; render(); } })]));
+    blocoRank.appendChild(el('div', { class: 'cab' }, [el('h3', { text: 'Quem mais dá lucro (30 dias)' }), el('button', { class: 'ini-ver-tabela', text: 'Abrir Lucro por produto', onclick: function () { state.tab = 'lucro'; render(); } })]));
     var cvRank = null;
     if (ranking.length) {
       cvRank = el('canvas', { role: 'img', 'aria-label': 'Produtos com maior lucro e com prejuízo nos últimos 30 dias' });
       blocoRank.appendChild(el('div', { class: 'ini-grafico', style: 'height:' + Math.max(200, ranking.length * 38 + 30) + 'px;' }, [cvRank]));
     } else {
-      blocoRank.appendChild(el('div', { class: 'pml-empty', text: 'Cadastre o custo dos produtos na aba Lucro real para ver o ranking.' }));
+      blocoRank.appendChild(el('div', { class: 'pml-empty', text: 'Cadastre o custo dos produtos na aba Lucro por produto para ver o ranking.' }));
     }
-    grid.appendChild(blocoRank);
 
     // Alertas
     var blocoAl = el('section', { class: 'ini-bloco ini-c6' });
@@ -155,7 +145,6 @@
     alertas.slice(0, 6).forEach(function (a) {
       blocoAl.appendChild(el('div', { class: 'ini-alerta' }, [el('div', { class: 'ic ' + a[0], 'aria-hidden': 'true', text: a[1] }), el('div', {}, [el('b', { text: a[2] }), el('span', { text: a[3] })])]));
     });
-    grid.appendChild(blocoAl);
 
     grid.appendChild(blocoMapaCalor());
     wrap.appendChild(grid);

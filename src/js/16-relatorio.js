@@ -108,7 +108,7 @@
 
     var destaques = linhas.filter(function (g) { return g.lucro !== null && g.lucro > 0; }).sort(function (a, b) { return b.lucro - a.lucro; }).slice(0, 5);
     var plano = itens.slice(0, 6).map(function (i) { return i.acao; });
-    if (tot.semCusto.length) plano.push('Cadastre o custo de ' + tot.semCusto.length + ' produto(s) na aba Lucro real (' + fmtMoney(tot.receitaSemCusto) + ' em vendas sem lucro conhecido).');
+    if (tot.semCusto.length) plano.push('Cadastre o custo de ' + tot.semCusto.length + ' produto(s) na aba Lucro por produto (' + fmtMoney(tot.receitaSemCusto) + ' em vendas sem lucro conhecido).');
     if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'aumentar'; }).slice(0, 2).forEach(function (a) { plano.push('Aumente o orçamento do Ads de ' + curto(a.titulo) + ': o Ads leva ' + fmtPct(a.acos) + ' e a margem é ' + fmtPct(a.margem) + '.'); });
     if (destaques[0]) plano.push('Garanta estoque de ' + curto(destaques[0].titulo) + ', o produto que mais deu lucro (' + fmtMoney(destaques[0].lucro) + ').');
 

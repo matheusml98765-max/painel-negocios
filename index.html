@@ -102,8 +102,10 @@
   #app-root button:focus-visible, #app-root input:focus-visible, #app-root select:focus-visible, #app-root summary:focus-visible {
     outline: 2px solid var(--electric); outline-offset: 2px;
   }
-  .pml-wrap { max-width: 1240px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
-  .pml-wrap.largo { max-width: 1240px; }
+  .pml-wrap { max-width: 1460px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+  .pml-wrap.largo { max-width: 1460px; }
+  .pml-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .pml-main { min-width: 0; }
 
   /* Cabecalho */
   .pml-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
@@ -116,8 +118,10 @@
   .pml-tema-btn:hover { border-color: var(--accent); }
 
   /* Abas */
-  .pml-tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); padding: 5px; border-radius: 14px; margin-bottom: 1.75rem; width: fit-content; max-width: 100%; flex-wrap: wrap; box-shadow: var(--shadow); }
-  .pml-tab { border: none; background: transparent; padding: 9px 18px; font-size: 14px; font-weight: 600; color: var(--muted); border-radius: 10px; cursor: pointer; font-family: inherit; transition: color .15s ease, background-color .15s ease; }
+  .pml-tabs { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--line); padding: 8px; border-radius: 14px; box-shadow: var(--shadow); position: sticky; top: 16px; }
+  .pml-tabs-grupo { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 12px 12px 4px; opacity: .8; }
+  .pml-tabs-grupo:first-child { padding-top: 4px; }
+  .pml-tab { text-align: left; border: none; background: transparent; padding: 9px 12px; font-size: 14px; font-weight: 600; color: var(--muted); border-radius: 10px; cursor: pointer; font-family: inherit; transition: color .15s ease, background-color .15s ease; }
   .pml-tab:hover { color: var(--ink); }
   .pml-tab.active { background: linear-gradient(135deg, var(--accent), var(--electric)); color: #fff; box-shadow: 0 6px 18px -8px var(--accent); }
 
@@ -233,6 +237,12 @@
   .ini-tabela-mini td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
   .ini-ver-tabela { background: none; border: none; color: var(--accent-strong); font: 600 12.5px 'Manrope', sans-serif; cursor: pointer; padding: 0; }
 
+  @media (max-width: 900px) {
+    .pml-layout { grid-template-columns: 1fr; gap: 14px; }
+    .pml-tabs { flex-direction: row; overflow-x: auto; position: static; padding: 5px; -webkit-overflow-scrolling: touch; }
+    .pml-tabs-grupo { display: none; }
+    .pml-tab { white-space: nowrap; flex: 0 0 auto; }
+  }
   @media (max-width: 980px) {
     .ini-hoje, .ini-mes, .ini-c8, .ini-c4, .ini-c6 { grid-column: span 12; }
   }
@@ -320,6 +330,7 @@
   .tarefa-x { background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 6px; }
   .tarefa-x:hover { color: var(--bad); }
   @media print {
+    .pml-layout { display: block; }
     .pml-tabs, .pml-header-acoes, .rel-acoes, #intro, .pml-import-summary { display: none !important; }
     .pml-card, .pml-metric { box-shadow: none !important; break-inside: avoid; }
   }
@@ -882,17 +893,23 @@
     wrap.appendChild(header);
   }
 
+  // Menu lateral (no celular vira uma faixa no topo que rola para o lado), em grupos
+  var GRUPOS_ABAS = [
+    ['Dia a dia', [['dia', 'Meu dia'], ['geral', 'Início'], ['calendario', 'Calendário']]],
+    ['Dinheiro', [['lucro', 'Lucro por produto'], ['relatorio', 'Relatório do mês'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['financeiro', 'Financeiro']]],
+    ['Produção e estoque', [['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque']]],
+    ['Organização', [['tarefas', 'Tarefas'], ['conquistas', 'Conquistas'], ['importar', 'Importar e backup']]]
+  ];
   function renderTabs(wrap) {
-    var tabs = el('div', { class: 'pml-tabs' });
-    [['dia', 'Meu dia'], ['geral', 'Início'], ['lucro', 'Lucro real'], ['calc3d', 'Calculadora 3D'], ['estoque', 'Estoque'], ['financeiro', 'Financeiro'], ['relatorio', 'Relatório'], ['calendario', 'Calendário'], ['tarefas', 'Tarefas'], ['contas', 'Contas'], ['receber', 'A receber'], ['cpf', 'CPF'], ['conquistas', 'Conquistas'], ['importar', 'Importar']].forEach(function (t) {
-      var btn = el('button', {
-        class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''),
-        text: t[1],
-        onclick: function () { state.tab = t[0]; render(); }
+    var nav = el('nav', { class: 'pml-tabs', 'aria-label': 'Abas do painel' });
+    GRUPOS_ABAS.forEach(function (g) {
+      nav.appendChild(el('div', { class: 'pml-tabs-grupo', text: g[0] }));
+      g[1].forEach(function (t) {
+        nav.appendChild(el('button', { class: 'pml-tab' + (state.tab === t[0] ? ' active' : ''), text: t[1],
+          onclick: function () { state.tab = t[0]; render(); try { window.scrollTo(0, 0); } catch (e) {} } }));
       });
-      tabs.appendChild(btn);
     });
-    wrap.appendChild(tabs);
+    wrap.appendChild(nav);
   }
 
   function fonteAtrasada(url, ultimaSync) {
@@ -1823,7 +1840,7 @@
     var sau = el('div', { class: 'ini-saudacao' }, [
       el('div', {}, [
         el('h1', { text: saudacao(agora) + ', ' + NOME_DONO }),
-        el('p', { text: dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1) + '. Este é o resumo da ' + NOME_LOJA + '.' })
+        el('p', { text: dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1) + '. Como estão as vendas da ' + NOME_LOJA + ' agora.' })
       ]),
       el('div', { class: 'ini-atualizado' }, [
         el('span', { class: 'ini-pulso' + (horas !== null && horas > 6 ? ' parado' : '') }),
@@ -1831,7 +1848,6 @@
       ])
     ]);
     wrap.appendChild(sau);
-    renderAvisos(wrap);
 
     var grid = el('div', { class: 'ini-grid' });
 
@@ -1850,7 +1866,6 @@
         el('div', {}, [el('b', { text: fmtMoney(d.hoje.plat.shopee || 0) }), el('span', { text: 'Shopee' })])
       ])
     ]);
-    grid.appendChild(hojeCard);
 
     // Mes
     var nomeMes = agora.toLocaleDateString('pt-BR', { month: 'long' });
@@ -1859,20 +1874,13 @@
     }
     var mes = el('div', { class: 'ini-mes' }, [
       kpi('Faturamento de ' + nomeMes, fmtMoney(d.mes.total), d.mes.pedidos + ' pedidos · ticket ' + fmtMoney(d.mes.pedidos ? d.mes.total / d.mes.pedidos : 0)),
-      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro real', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
+      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
       kpi('As plataformas ficaram com', levou === null ? '—' : fmtPct(levou), 'ML ' + fmtPct(ficouMl) + ' · Shopee ' + fmtPct(ficouShopee) + ' das vendas, antes do Ads'),
       kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
-    grid.appendChild(mes);
     var lucroMesCalc = calcLucroPorProduto(agora.getDate()).linhas.reduce(function (s, g) { return g.lucro !== null ? s + g.lucro : s; }, 0);
     grid.appendChild(blocoMetas(d, lucroMesCalc));
     renderVendasDoDia(grid);
-    var escWrap = el('section', { class: 'ini-bloco ini-c12' });
-    renderEscadaCard(escWrap, isoHoje(0).slice(0, 8) + '01', isoHoje(0), 'Este mês: do faturamento ao seu bolso');
-    grid.appendChild(escWrap);
-    var caixaWrap = el('section', { class: 'ini-bloco ini-c12' });
-    renderCaixaCard(caixaWrap);
-    grid.appendChild(caixaWrap);
 
     // Grafico diario por plataforma
     var plats = ['ml', 'shopee', 'tiktok', 'outro'].filter(function (p) { return (d.plat30[p] || 0) > 0; });
@@ -1917,15 +1925,14 @@
     var comLucro = lucro.linhas.filter(function (g) { return g.lucro !== null; }).sort(function (a, b) { return b.lucro - a.lucro; });
     var ranking = comLucro.slice(0, 6).concat(comLucro.filter(function (g) { return g.lucro < 0; }).filter(function (g) { return comLucro.indexOf(g) >= 6; }));
     var blocoRank = el('section', { class: 'ini-bloco ini-c6' });
-    blocoRank.appendChild(el('div', { class: 'cab' }, [el('h3', { text: 'Quem mais dá lucro (30 dias)' }), el('button', { class: 'ini-ver-tabela', text: 'Abrir Lucro real', onclick: function () { state.tab = 'lucro'; render(); } })]));
+    blocoRank.appendChild(el('div', { class: 'cab' }, [el('h3', { text: 'Quem mais dá lucro (30 dias)' }), el('button', { class: 'ini-ver-tabela', text: 'Abrir Lucro por produto', onclick: function () { state.tab = 'lucro'; render(); } })]));
     var cvRank = null;
     if (ranking.length) {
       cvRank = el('canvas', { role: 'img', 'aria-label': 'Produtos com maior lucro e com prejuízo nos últimos 30 dias' });
       blocoRank.appendChild(el('div', { class: 'ini-grafico', style: 'height:' + Math.max(200, ranking.length * 38 + 30) + 'px;' }, [cvRank]));
     } else {
-      blocoRank.appendChild(el('div', { class: 'pml-empty', text: 'Cadastre o custo dos produtos na aba Lucro real para ver o ranking.' }));
+      blocoRank.appendChild(el('div', { class: 'pml-empty', text: 'Cadastre o custo dos produtos na aba Lucro por produto para ver o ranking.' }));
     }
-    grid.appendChild(blocoRank);
 
     // Alertas
     var blocoAl = el('section', { class: 'ini-bloco ini-c6' });
@@ -1952,7 +1959,6 @@
     alertas.slice(0, 6).forEach(function (a) {
       blocoAl.appendChild(el('div', { class: 'ini-alerta' }, [el('div', { class: 'ic ' + a[0], 'aria-hidden': 'true', text: a[1] }), el('div', {}, [el('b', { text: a[2] }), el('span', { text: a[3] })])]));
     });
-    grid.appendChild(blocoAl);
 
     grid.appendChild(blocoMapaCalor());
     wrap.appendChild(grid);
@@ -2019,7 +2025,7 @@
   function plataformasPadrao() {
     return [
       { id: 'shopee', nome: 'Shopee', comissao: 20, taxaFixa: 4.5, frete: 0, ads: 15.5, nota: 'Nas suas vendas reais: cerca de 18,6% de comissão + 1,4% de serviço + R$ 4,50 fixos por pedido. Afiliados cobram à parte quando a venda vem deles.' },
-      { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro real.' },
+      { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro por produto.' },
       { id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, frete: 0, ads: 0, nota: 'Abaixo de R$ 50: 10% + R$ 4 por item (desde 15/07/2026).' }
     ];
   }
@@ -2132,7 +2138,7 @@
     };
   }
 
-  // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro real)
+  // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro por produto)
   function custo3dDoAnuncio(itemId, dataRef) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
@@ -2233,7 +2239,7 @@
     // ---------- Pecas ----------
     var pc = el('div', { class: 'pml-card' });
     pc.appendChild(el('p', { class: 'pml-section-title', text: '4. Suas peças — custo de cada uma' }));
-    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB do Mercado Livre e o ID do item da Shopee dessa peça para o lucro aparecer na aba Lucro real.' }));
+    pc.appendChild(el('p', { class: 'pml-note', style: 'margin:-6px 0 14px;', text: 'Gramas e horas vêm do fatiador (Cura, Bambu Studio, Orca...). Se imprime várias peças de uma vez, informe quantas saem por impressão. Em "Anúncios", cole os códigos MLB do Mercado Livre e o ID do item da Shopee dessa peça para o lucro aparecer na aba Lucro por produto.' }));
     c.produtos.forEach(function (p) {
       var custo = custoPeca3d(p);
       var selTipo = el('select', {}, tiposFilamento().map(function (t) { var o = el('option', { value: t, text: t }); if ((p.tipo || '').toUpperCase() === t) o.setAttribute('selected', ''); return o; }));
@@ -2560,7 +2566,7 @@
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão, taxas e frete' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: nomePlat + ' ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro dos produtos' + (tot.semCusto ? ' (com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
     ]);
     if (ads && ads.gasto > 0) {
       metr.appendChild(el('div', { class: 'pml-metric' }, [
@@ -2597,14 +2603,19 @@
     card.appendChild(topo);
     card.appendChild(filtros);
 
+    // Ads de cada anuncio e o que fazer (antes ficava num quadro separado, repetindo esta tabela)
+    var rank = {};
+    calcRanking(dias, plat).forEach(function (x) { rank[x.plataforma + ':' + String(x.itemId).toUpperCase()] = x; });
     var table = el('table', { class: 'pml-table pml-tabela-lucro' });
     table.appendChild(el('tr', {}, [
       el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Un.' }), el('th', { class: 'num', text: 'Preço méd.' }),
       el('th', { class: 'num', text: 'Taxas' }), el('th', { class: 'num', text: 'Recebido' }), el('th', { class: 'num', text: 'Custo un.' }),
-      el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Margem' }),
-      el('th', { class: 'num', text: 'Pagar até' })
+      el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Ads' }),
+      el('th', { class: 'num', text: 'Depois do Ads' }), el('th', { class: 'num', text: 'Margem real' }),
+      el('th', { class: 'num', text: 'Pagar até' }), el('th', { text: 'O que fazer' })
     ]));
     linhas.forEach(function (g) {
+      var rk = rank[g.plataforma + ':' + String(g.itemId).toUpperCase()] || null;
       var classe = '';
       var tag = null;
       if (g.lucro !== null && g.lucro < 0) { classe = 'pml-row-alerta'; tag = el('span', { class: 'pml-tag prejuizo', text: 'prejuízo' }); }
@@ -2638,15 +2649,17 @@
         celCusto,
         el('td', { class: 'num', style: g.lucroUnit !== null && g.lucroUnit < 0 ? 'color:var(--bad); font-weight:700;' : 'font-weight:600;', text: g.lucroUnit === null ? '—' : fmtMoney(g.lucroUnit) }),
         el('td', { class: 'num', text: g.lucro === null ? '—' : fmtMoney(g.lucro) }),
-        el('td', { class: 'num', text: fmtPct(g.margem) }),
-        el('td', { class: 'num', title: 'Preço máximo de compra para ter ' + cfg.margemAlvo + '% de margem', text: g.maxCompra === null ? '—' : fmtMoney(Math.max(0, g.maxCompra)) })
+        el('td', { class: 'num', text: rk && rk.ads ? '− ' + fmtMoney(rk.ads) : '—' }),
+        el('td', { class: 'num', style: 'font-weight:700; color:' + (rk ? (rk.real >= 0 ? 'var(--good)' : 'var(--bad)') : 'inherit'), text: rk ? fmtMoney(rk.real) : '—' }),
+        el('td', { class: 'num', text: rk ? fmtPct(rk.margem) : fmtPct(g.margem) }),
+        el('td', { class: 'num', title: 'Preço máximo de compra para ter ' + cfg.margemAlvo + '% de margem', text: g.maxCompra === null ? '—' : fmtMoney(Math.max(0, g.maxCompra)) }),
+        el('td', { style: 'font-weight:700; white-space:nowrap; color:' + (rk ? (COR_ACAO[rk.acao] || 'inherit') : 'var(--muted)'), text: rk ? rk.acao : (g.lucro === null ? 'cadastrar custo' : '—') })
       ]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads aparece por produto logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Ads</b> = o que o anúncio gastou de Ads no período. <b>Depois do Ads</b> e <b>Margem real</b> = o lucro que sobrou de verdade. <b>O que fazer</b>: escalar (margem real de 20%+ e 5+ vendas), baixar Ads (Ads come mais de 40% do lucro), subir preço (margem real abaixo de 8%). <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. Os detalhes do Ads (ACOS, campanhas) estão logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
-    renderRankingCard(wrap, dias, plat);
     renderAdsPorProduto(wrap, plat);
     if (plat !== 'shopee') { renderFaixaPrecoCard(wrap); renderAuditoriaCard(wrap); }
     if (plat !== 'ml') renderKitsCard(wrap);
@@ -3233,7 +3246,7 @@
     var nomeAds = ads.plataformas.length > 1 ? 'Ads por produto (ML e Shopee' : (ads.plataformas[0] === 'ml' ? 'Product Ads do ML por produto (' : 'Shopee Ads por produto (');
     card.appendChild(el('p', { class: 'pml-section-title', text: nomeAds + (ads.plataformas.length > 1 ? ', ' : '') + ads.dias + ' dias)' }));
     var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { class: 'num', text: 'Lucro depois do Ads' }), el('th', { text: 'O que fazer' })]));
+    t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { text: 'O que fazer com o Ads' })]));
     var economia = 0;
     ads.linhas.forEach(function (a) {
       var dec = DECISAO_ADS[a.decisao];
@@ -3247,7 +3260,6 @@
         el('td', { class: 'num', text: fmtMoney(a.vendasAds) + ' · ' + a.pedidosAds + ' ped.' }),
         el('td', { class: 'num', text: fmtPct(a.acos) }),
         el('td', { class: 'num', text: fmtPct(a.margem) }),
-        el('td', { class: 'num', style: a.lucroDepois !== null && a.lucroDepois < 0 ? 'color:var(--bad); font-weight:700;' : '', text: a.lucroDepois === null ? '—' : fmtMoney(a.lucroDepois) }),
         el('td', { title: dec.dica }, [el('span', { class: 'pml-tag ' + dec.tag, style: 'margin-left:0;', text: dec.texto })])
       ]));
     });
@@ -3301,7 +3313,7 @@
         det.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
         card.appendChild(det);
       }
-      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
+      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro por produto, coluna "Pagar até".' }));
     } else {
       card.appendChild(el('p', { class: 'pml-note', text: 'Para ver quando cada produto acaba, cadastre abaixo a quantidade em estoque e o código do anúncio.' }));
     }
@@ -3417,7 +3429,7 @@
 
     var destaques = linhas.filter(function (g) { return g.lucro !== null && g.lucro > 0; }).sort(function (a, b) { return b.lucro - a.lucro; }).slice(0, 5);
     var plano = itens.slice(0, 6).map(function (i) { return i.acao; });
-    if (tot.semCusto.length) plano.push('Cadastre o custo de ' + tot.semCusto.length + ' produto(s) na aba Lucro real (' + fmtMoney(tot.receitaSemCusto) + ' em vendas sem lucro conhecido).');
+    if (tot.semCusto.length) plano.push('Cadastre o custo de ' + tot.semCusto.length + ' produto(s) na aba Lucro por produto (' + fmtMoney(tot.receitaSemCusto) + ' em vendas sem lucro conhecido).');
     if (adsProd) adsProd.linhas.filter(function (a) { return a.decisao === 'aumentar'; }).slice(0, 2).forEach(function (a) { plano.push('Aumente o orçamento do Ads de ' + curto(a.titulo) + ': o Ads leva ' + fmtPct(a.acos) + ' e a margem é ' + fmtPct(a.margem) + '.'); });
     if (destaques[0]) plano.push('Garanta estoque de ' + curto(destaques[0].titulo) + ', o produto que mais deu lucro (' + fmtMoney(destaques[0].lucro) + ').');
 
@@ -4562,7 +4574,7 @@
     var brutoComLucro = r.vendas.reduce(function (s, v) { return s + (v.lucro !== null ? v.valor : 0); }, 0);
     var margemDia = brutoComLucro > 0 ? lucroDia / brutoComLucro : null;
     bloco.appendChild(el('div', { class: 'pml-metrics', style: 'margin:10px 0;' }, [
-      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas')),
+      metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) + (function () { var o = calcVendasDoDia(dia === hoje ? ontem : isoHoje(-2)).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : 'anteontem') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
       metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
@@ -4588,7 +4600,7 @@
       ]));
     });
     bloco.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-    bloco.appendChild(el('p', { class: 'pml-note', text: 'As vendas chegam pela automação de hora em hora (6h às 23h) ou na hora pelo botão Atualizar agora. Na Shopee, as taxas de um pedido às vezes só aparecem depois que ele é enviado. "Sem custo": cadastre o custo do produto na aba Lucro real ou na Calculadora 3D.' }));
+    bloco.appendChild(el('p', { class: 'pml-note', text: 'As vendas chegam pela automação de hora em hora (6h às 23h) ou na hora pelo botão Atualizar agora. Na Shopee, as taxas de um pedido às vezes só aparecem depois que ele é enviado. "Sem custo": cadastre o custo do produto na aba Lucro por produto ou na Calculadora 3D.' }));
     grid.appendChild(bloco);
   }
 
@@ -4805,9 +4817,13 @@
     var sc = Object.keys(semCusto);
     if (sc.length && !visto('semcusto')) av.push({ k: 'semcusto', icone: '❓', texto: sc.length + ' produto(s) vendidos nesta semana sem custo cadastrado: ' + sc.slice(0, 3).map(function (k) { return String(semCusto[k]).slice(0, 40); }).join('; ') + (sc.length > 3 ? '...' : ''), ir: 'lucro', botao: 'Cadastrar custo' });
     if (!tokenGist() && !visto('nuvem')) av.push({ k: 'nuvem', icone: '☁️', texto: 'Seus custos e cadastros estão só neste navegador. Ligue a cópia automática na nuvem para não perder nada.', ir: 'importar', botao: 'Ligar cópia' });
-    // Automacao
-    var h = horasDesdeAtualizacaoAutomacao();
-    if (h !== null && h > 3 && new Date().getHours() >= 7) av.unshift({ k: 'auto', icone: '⚠️', texto: 'A automação não atualiza há ' + Math.round(h) + ' horas. As vendas podem estar faltando.', forte: true, fixo: true });
+    // Caixa: saldo previsto negativo nos proximos 7 dias (a previsao completa fica na aba Contas)
+    if (typeof calcCaixa === 'function') {
+      try {
+        var cx = calcCaixa(7);
+        if (cx.saldo !== null && cx.menor && cx.menor.saldo < 0) av.push({ k: 'caixa', icone: '💸', texto: 'O saldo do Mercado Pago fica negativo em ' + cx.menor.dia.split('-').reverse().slice(0, 2).join('/') + ' (' + fmtMoney(cx.menor.saldo) + ') pelas contas a pagar.', ir: 'contas', botao: 'Ver previsão', forte: true, fixo: true });
+      } catch (e) {}
+    }
     return av;
   }
 
@@ -5183,17 +5199,8 @@
       ]));
     }
 
-    var pend = pendenciasDeHoje();
-    if (pend.length) {
-      var cp = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: '📌 Hoje também' })]);
-      pend.forEach(function (p) {
-        cp.appendChild(el('div', { class: 'aviso' + (p.forte ? ' forte' : '') }, [
-          el('span', { class: 'aviso-icone', text: p.icone }), el('span', { class: 'aviso-texto', text: p.texto }),
-          p.ir ? el('span', { class: 'aviso-acoes' }, [el('button', { class: 'pml-btn secondary', text: 'Ver', onclick: function () { state.tab = p.ir; render(); window.scrollTo(0, 0); } })]) : null
-        ].filter(Boolean)));
-      });
-      wrap.appendChild(cp);
-    }
+    // Avisos do dia (contas, tarefas, compras, falhas, CPF): ficam so aqui, para nao repetir no Inicio
+    renderAvisos(wrap);
 
     if (!secoes.length) {
       wrap.appendChild(el('div', { class: 'pml-card' }, [el('div', { class: 'pml-empty', text: 'Sua rotina ainda não foi montada. Me mande no chat o que você quer fazer todo dia que eu coloco aqui.' })]));
@@ -5640,15 +5647,19 @@
     wrap.appendChild(card);
   }
 
-  // ---- Ranking do lucro de verdade por anuncio, com o que fazer ----
+  // ---- Lucro de verdade por anuncio (depois do Ads), com o que fazer: colunas da tabela Lucro por produto ----
   function calcRanking(dias, plat) {
-    var ads = calcAdsPorProduto(plat || 'todas'), gasto = {};
-    ((ads && ads.linhas) || []).forEach(function (x) { gasto[String(x.itemId).toUpperCase()] = (gasto[String(x.itemId).toUpperCase()] || 0) + x.gasto * (dias / (ads.dias || 30)); });
+    var ads = calcAdsPorProduto(plat || 'todas'), gasto = {}, decAds = {};
+    ((ads && ads.linhas) || []).forEach(function (x) {
+      var k = String(x.itemId).toUpperCase();
+      gasto[k] = (gasto[k] || 0) + x.gasto * (dias / (ads.dias || 30));
+      decAds[k] = x.decisao;   // a mesma decisao do quadro de Ads (ACOS x margem), para os dois nao se contradizerem
+    });
     return calcLucroPorProduto(dias, plat || 'todas').linhas.filter(function (g) { return g.lucro !== null && g.unidades > 0; }).map(function (g) {
       var a = gasto[String(g.itemId).toUpperCase()] || 0, real = g.lucro - a, margem = g.receita ? real / g.receita : 0;
-      var acao;
+      var acao, dA = decAds[String(g.itemId).toUpperCase()];
       if (real < 0) acao = a > 0 && g.lucro > 0 ? 'baixar Ads' : 'subir preço ou pausar';
-      else if (a > 0 && a > g.lucro * 0.4) acao = 'baixar Ads';
+      else if (a > 0 && dA === 'pausar') acao = 'baixar Ads';
       else if (margem < 0.08) acao = 'subir preço';
       else if (margem >= 0.2 && g.unidades >= 5) acao = 'escalar';
       else acao = 'manter';
@@ -5657,26 +5668,6 @@
   }
 
   var COR_ACAO = { 'escalar': 'var(--good)', 'manter': 'var(--muted)', 'subir preço': 'var(--warn)', 'baixar Ads': 'var(--warn)', 'subir preço ou pausar': 'var(--bad)' };
-  function renderRankingCard(wrap, dias, plat) {
-    var r = calcRanking(dias, plat);
-    if (!r.length) return;
-    var card = el('div', { class: 'pml-card' }, [el('p', { class: 'pml-section-title', text: 'Ranking do lucro de verdade por anúncio (' + dias + ' dias)' }),
-      el('p', { class: 'pml-margin', style: 'margin:0 0 8px;', text: 'Lucro depois de taxas, imposto, custo, devoluções e Ads de cada anúncio. A etiqueta diz o que fazer.' })]);
-    var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, ['Anúncio', 'Vendidos', 'Lucro', 'Ads', 'Lucro real', 'Margem real', 'O que fazer'].map(function (h, i) { return el('th', { class: i && i < 6 ? 'num' : '', text: h }); })));
-    var mostrar = r.length > 16 ? r.slice(0, 10).concat(r.slice(-6)) : r;
-    mostrar.forEach(function (x) {
-      t.appendChild(el('tr', {}, [el('td', { text: (x.plataforma === 'shopee' ? 'Shopee · ' : 'ML · ') + String(x.titulo).slice(0, 40) }),
-        el('td', { class: 'num', text: String(x.unidades) }), el('td', { class: 'num', text: fmtMoney(x.lucro) }),
-        el('td', { class: 'num', text: x.ads ? '− ' + fmtMoney(x.ads) : '—' }),
-        el('td', { class: 'num', style: 'font-weight:700; color:' + (x.real >= 0 ? 'var(--good)' : 'var(--bad)'), text: fmtMoney(x.real) }),
-        el('td', { class: 'num', text: fmtPct(x.margem) }),
-        el('td', { style: 'font-weight:700; color:' + (COR_ACAO[x.acao] || 'inherit'), text: x.acao })]));
-    });
-    card.appendChild(el('div', { class: 'pml-scroll' }, [t]));
-    card.appendChild(el('p', { class: 'pml-note', text: (r.length > 16 ? 'Mostrando os 10 melhores e os 6 piores de ' + r.length + '. ' : '') + 'Escalar: margem real de 20% ou mais e 5+ vendas (mais estoque, mais Ads). Baixar Ads: o Ads come mais de 40% do lucro. Subir preço: margem real abaixo de 8%. O Ads de cada anúncio é dos últimos 30 dias, proporcional ao período.' }));
-    wrap.appendChild(card);
-  }
   // ===================== PLANO DE IMPRESSAO DO DIA =====================
   // Ritmo de vendas de cada peca 3D (ultimos 14 dias) + estoque pronto (o vendedor informa) +
   // horas das impressoras -> o que imprimir hoje para nao faltar o que mais vende.
@@ -5918,10 +5909,15 @@
     root.innerHTML = '';
     var wrap = el('div', { class: 'pml-wrap' + (state.tab === 'lucro' || state.tab === 'calc3d' || state.tab === 'relatorio' || state.tab === 'calendario' || state.tab === 'cpf' || state.tab === 'contas' ? ' largo' : '') });
     renderHeader(wrap);
-    renderTabs(wrap);
+    // Menu na esquerda e o conteudo da aba na direita
+    var pagina = wrap, layout = el('div', { class: 'pml-layout' }), main = el('main', { class: 'pml-main' });
+    renderTabs(layout);
+    layout.appendChild(main);
+    pagina.appendChild(layout);
+    wrap = main;
     if (!state.loaded) {
       wrap.appendChild(el('div', { class: 'pml-empty', text: 'Carregando seu painel...' }));
-      root.appendChild(wrap);
+      root.appendChild(pagina);
       return;
     }
     if (state.errorMsg) {
@@ -5966,7 +5962,7 @@
       renderImportarTab(wrap);
       renderBackupCard(wrap);
     }
-    root.appendChild(wrap);
+    root.appendChild(pagina);
   }
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)

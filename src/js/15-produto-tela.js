@@ -123,7 +123,7 @@
     var nomeAds = ads.plataformas.length > 1 ? 'Ads por produto (ML e Shopee' : (ads.plataformas[0] === 'ml' ? 'Product Ads do ML por produto (' : 'Shopee Ads por produto (');
     card.appendChild(el('p', { class: 'pml-section-title', text: nomeAds + (ads.plataformas.length > 1 ? ', ' : '') + ads.dias + ' dias)' }));
     var t = el('table', { class: 'pml-table' });
-    t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { class: 'num', text: 'Lucro depois do Ads' }), el('th', { text: 'O que fazer' })]));
+    t.appendChild(el('tr', {}, [el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Gasto' }), el('th', { class: 'num', text: 'Vendas pelo Ads' }), el('th', { class: 'num', text: 'Ads levou' }), el('th', { class: 'num', text: 'Sua margem' }), el('th', { text: 'O que fazer com o Ads' })]));
     var economia = 0;
     ads.linhas.forEach(function (a) {
       var dec = DECISAO_ADS[a.decisao];
@@ -137,7 +137,6 @@
         el('td', { class: 'num', text: fmtMoney(a.vendasAds) + ' · ' + a.pedidosAds + ' ped.' }),
         el('td', { class: 'num', text: fmtPct(a.acos) }),
         el('td', { class: 'num', text: fmtPct(a.margem) }),
-        el('td', { class: 'num', style: a.lucroDepois !== null && a.lucroDepois < 0 ? 'color:var(--bad); font-weight:700;' : '', text: a.lucroDepois === null ? '—' : fmtMoney(a.lucroDepois) }),
         el('td', { title: dec.dica }, [el('span', { class: 'pml-tag ' + dec.tag, style: 'margin-left:0;', text: dec.texto })])
       ]));
     });
@@ -191,7 +190,7 @@
         det.appendChild(el('div', { class: 'pml-scroll' }, [t2]));
         card.appendChild(det);
       }
-      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro real, coluna "Pagar até".' }));
+      card.appendChild(el('p', { class: 'pml-note', text: 'Mercado Livre: estoque real de cada anúncio, atualizado pela automação (Full incluso). Outros produtos: a quantidade cadastrada abaixo (ela baixa sozinha a cada venda). Ritmo = média de vendas dos últimos 30 dias. "Comprar" = o que falta para aguentar a entrega mais 30 dias de vendas. O preço máximo para pagar está na aba Lucro por produto, coluna "Pagar até".' }));
     } else {
       card.appendChild(el('p', { class: 'pml-note', text: 'Para ver quando cada produto acaba, cadastre abaixo a quantidade em estoque e o código do anúncio.' }));
     }

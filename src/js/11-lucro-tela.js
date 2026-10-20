@@ -51,7 +51,7 @@
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Faturamento (' + (dias === 1 ? 'hoje' : dias + ' dias') + ')' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.receita) }), el('p', { class: 'pml-margin', text: tot.unidades + ' unidades vendidas' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Você recebeu (líquido)' }), el('p', { class: 'pml-metric-value', text: fmtMoney(tot.liquido) }), el('p', { class: 'pml-margin', text: 'depois de comissão, taxas e frete' })]),
       el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: nomePlat + ' ficou com' }), el('p', { class: 'pml-metric-value neg', text: fmtPct(levou) }), el('div', { class: 'pml-barra' }, [el('span', { style: 'width:' + Math.min(100, levou * 100).toFixed(1) + '%' })])]),
-      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro real' + (tot.semCusto ? ' (produtos com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
+      el('div', { class: 'pml-metric' }, [el('p', { class: 'pml-metric-label', text: 'Lucro dos produtos' + (tot.semCusto ? ' (com custo)' : '') }), el('p', { class: 'pml-metric-value ' + (tot.lucro >= 0 ? 'pos' : 'neg'), text: fmtMoney(tot.lucro) }), el('p', { class: 'pml-margin', text: 'margem ' + fmtPct(tot.receitaComCusto ? tot.lucro / tot.receitaComCusto : null) + ', já sem imposto' + (ads && ads.gasto ? ' (antes do Ads)' : '') })])
     ]);
     if (ads && ads.gasto > 0) {
       metr.appendChild(el('div', { class: 'pml-metric' }, [
@@ -88,14 +88,19 @@
     card.appendChild(topo);
     card.appendChild(filtros);
 
+    // Ads de cada anuncio e o que fazer (antes ficava num quadro separado, repetindo esta tabela)
+    var rank = {};
+    calcRanking(dias, plat).forEach(function (x) { rank[x.plataforma + ':' + String(x.itemId).toUpperCase()] = x; });
     var table = el('table', { class: 'pml-table pml-tabela-lucro' });
     table.appendChild(el('tr', {}, [
       el('th', { text: 'Produto' }), el('th', { class: 'num', text: 'Un.' }), el('th', { class: 'num', text: 'Preço méd.' }),
       el('th', { class: 'num', text: 'Taxas' }), el('th', { class: 'num', text: 'Recebido' }), el('th', { class: 'num', text: 'Custo un.' }),
-      el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Margem' }),
-      el('th', { class: 'num', text: 'Pagar até' })
+      el('th', { class: 'num', text: 'Lucro/un.' }), el('th', { class: 'num', text: 'Lucro total' }), el('th', { class: 'num', text: 'Ads' }),
+      el('th', { class: 'num', text: 'Depois do Ads' }), el('th', { class: 'num', text: 'Margem real' }),
+      el('th', { class: 'num', text: 'Pagar até' }), el('th', { text: 'O que fazer' })
     ]));
     linhas.forEach(function (g) {
+      var rk = rank[g.plataforma + ':' + String(g.itemId).toUpperCase()] || null;
       var classe = '';
       var tag = null;
       if (g.lucro !== null && g.lucro < 0) { classe = 'pml-row-alerta'; tag = el('span', { class: 'pml-tag prejuizo', text: 'prejuízo' }); }
@@ -129,15 +134,17 @@
         celCusto,
         el('td', { class: 'num', style: g.lucroUnit !== null && g.lucroUnit < 0 ? 'color:var(--bad); font-weight:700;' : 'font-weight:600;', text: g.lucroUnit === null ? '—' : fmtMoney(g.lucroUnit) }),
         el('td', { class: 'num', text: g.lucro === null ? '—' : fmtMoney(g.lucro) }),
-        el('td', { class: 'num', text: fmtPct(g.margem) }),
-        el('td', { class: 'num', title: 'Preço máximo de compra para ter ' + cfg.margemAlvo + '% de margem', text: g.maxCompra === null ? '—' : fmtMoney(Math.max(0, g.maxCompra)) })
+        el('td', { class: 'num', text: rk && rk.ads ? '− ' + fmtMoney(rk.ads) : '—' }),
+        el('td', { class: 'num', style: 'font-weight:700; color:' + (rk ? (rk.real >= 0 ? 'var(--good)' : 'var(--bad)') : 'inherit'), text: rk ? fmtMoney(rk.real) : '—' }),
+        el('td', { class: 'num', text: rk ? fmtPct(rk.margem) : fmtPct(g.margem) }),
+        el('td', { class: 'num', title: 'Preço máximo de compra para ter ' + cfg.margemAlvo + '% de margem', text: g.maxCompra === null ? '—' : fmtMoney(Math.max(0, g.maxCompra)) }),
+        el('td', { style: 'font-weight:700; white-space:nowrap; color:' + (rk ? (COR_ACAO[rk.acao] || 'inherit') : 'var(--muted)'), text: rk ? rk.acao : (g.lucro === null ? 'cadastrar custo' : '—') })
       ]));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [table]));
-    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. O Ads aparece por produto logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
+    card.appendChild(el('p', { class: 'pml-note', html: '<b>Taxas</b> = tudo o que a plataforma descontou de cada venda real (vem da API): no ML, comissão e frete; na Shopee, comissão, taxa de serviço (inclui a taxa fixa por item), afiliados e proteção de frete. <b>Recebido</b> = o que caiu para você. <b>Lucro</b> = recebido − imposto (' + cfg.imposto + '%) − custo do produto. <b>Ads</b> = o que o anúncio gastou de Ads no período. <b>Depois do Ads</b> e <b>Margem real</b> = o lucro que sobrou de verdade. <b>O que fazer</b>: escalar (margem real de 20%+ e 5+ vendas), baixar Ads (Ads come mais de 40% do lucro), subir preço (margem real abaixo de 8%). <b>Pagar até</b> = o máximo que você pode pagar no produto para manter ' + cfg.margemAlvo + '% de margem. Os detalhes do Ads (ACOS, campanhas) estão logo abaixo. Clique no nome do produto para ver o histórico e simular desconto. Custos do mês que não são por venda (armazenagem Full, antecipação, eShop) aparecem na fatura abaixo.' }));
     wrap.appendChild(card);
 
-    renderRankingCard(wrap, dias, plat);
     renderAdsPorProduto(wrap, plat);
     if (plat !== 'shopee') { renderFaixaPrecoCard(wrap); renderAuditoriaCard(wrap); }
     if (plat !== 'ml') renderKitsCard(wrap);
