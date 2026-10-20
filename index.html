@@ -6043,7 +6043,7 @@
         campoNum('Preço do filamento (R$ por kg)', 'precoKg', '0.01', 'média das suas compras'), campoNum('Falhas (% a mais de filamento)', 'perda', '1')]),
       el('p', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: 'Luz e embalagem' }),
       el('div', { class: 'pml-form-grid' }, [campoNum('Impressora (watts)', 'watts', '1', 'Bambu A1 ≈ 100 W'), campoNum('Luz (R$ por kWh)', 'kwh', '0.01', 'da conta de luz'),
-        campoNum('Embalagem (R$)', 'embalagem', '0.01', 'caixa, saco, etiqueta, plástico...'), campoNum('Outros (R$)', 'outros', '0.01', 'fita, parafuso, brinde...')]),
+        campoNum('Embalagem e insumos (R$)', 'embalagem', '0.01', 'caixa, saco, etiqueta, fita, parafuso...'), campoNum('Outros (R$)', 'outros', '0.01', 'brinde, cartão...')]),
       el('p', { class: 'pml-metric-label', style: 'margin:14px 0 6px;', text: 'Venda' }),
       el('div', { class: 'pml-form-grid' }, [campoNum('Preço de venda (R$)', 'preco', '0.01'),
         el('div', { class: 'pml-field' }, [el('label', { text: 'Ads' }), el('label', { style: 'display:flex; gap:6px; align-items:center; font-weight:400;' }, [chk, el('span', { text: 'Descontar o Ads (Shopee ' + fmtPct(adsPctPlataforma('shopee')) + ' das vendas)' })])])])
