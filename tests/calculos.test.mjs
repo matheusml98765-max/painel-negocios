@@ -442,17 +442,39 @@ test('plano de impressão reparte as horas entre as peças pela urgência', () =
   const d = hoje();
   const c = p.getCalc3d();
   c.impressoras = [{ id: 'a', watts: 100 }];
-  c.produtos = [{ id: 'x', nome: 'Papel', horas: 4, porPlaca: 1, anuncios: 'MLB1' }, { id: 'y', nome: 'Secador', horas: 2, porPlaca: 1, anuncios: 'MLB2' }];
-  c.estoquePecas = { x: 0, y: 10 };
+  c.produtos = [{ id: 'x', nome: 'Papel', horas: 4, porPlaca: 1, anuncios: 'MLB1' }, { id: 'y', nome: 'Secador — dupla face', horas: 2, porPlaca: 1, anuncios: 'MLB2' },
+    { id: 'z', nome: 'Secador — parafuso', horas: 2, porPlaca: 1, anuncios: 'MLB3' }];
+  c.estoquePecas = { 'Papel|branco': 0, 'Secador|preto': 10 };
+  c.estoquePecasEm = '2000-01-01T00:00:00.000Z';
   p.state.calc3d = c;
   p.state.transacoes = [
-    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB1', quantidade: 28 }] },
-    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB2', quantidade: 28 }] },
+    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB1', titulo: 'Papel Branco', quantidade: 28 }] },
+    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB2', variacao: 'Preto,Dupla Face', quantidade: 14 }] },
+    { tipo: 'venda', data: d, valor: 20, itens: [{ item_id: 'MLB3', variacao: 'Preto,Parafuso', quantidade: 2 }] },
   ];
   const pl = p.calcPlanoImpressao();
-  assert.equal(pl.lista[0].nome, 'Papel', 'sem estoque vem primeiro');
-  assert.ok(pl.lista[0].hojePlacas > 0 && pl.lista[1].hojePlacas > 0, 'as duas peças entram no dia');
+  assert.equal(pl.lista.length, 2, 'dupla face e parafuso viram uma peça só, por cor');
+  assert.equal(pl.lista[0].nome, 'Papel branco', 'sem estoque vem primeiro');
+  const sec = pl.lista.find((x) => x.base === 'Secador');
+  assert.equal(sec.estoque, 0, 'as 16 vendas depois da contagem descontam as 10 prontas');
+  assert.ok(pl.lista[0].hojePlacas > 0 && sec.hojePlacas > 0, 'as duas peças entram no dia');
   assert.ok(pl.usadas <= pl.capacidade);
+});
+
+test('estoque de peças prontas só desconta vendas depois da contagem', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.impressoras = [{ id: 'a', watts: 100 }];
+  c.produtos = [{ id: 'x', nome: 'Pia', horas: 3, porPlaca: 1, anuncios: 'MLB1' }];
+  c.estoquePecas = { 'Pia|preto': 11 };
+  c.estoquePecasEm = '2026-10-20T18:30:00.000Z';
+  p.state.calc3d = c;
+  p.state.transacoes = [
+    { tipo: 'venda', data: '2026-10-20', dataHora: '2026-10-20T15:00:00.000Z', valor: 20, itens: [{ item_id: 'MLB1', titulo: 'Pia Preto', quantidade: 2 }] },
+    { tipo: 'venda', data: '2026-10-20', dataHora: '2026-10-20T19:00:00.000Z', valor: 20, itens: [{ item_id: 'MLB1', titulo: 'Pia Preto', quantidade: 3 }] },
+  ];
+  const pl = p.calcPlanoImpressao();
+  assert.equal(pl.lista.find((x) => x.cor === 'preto').estoque, 8);
 });
 
 test('insumo perdido baixa o estoque e entra no lucro como perda', () => {
