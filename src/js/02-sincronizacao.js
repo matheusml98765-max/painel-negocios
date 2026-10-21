@@ -10,6 +10,7 @@
     try {
       var t = await window.storage.get('ml-transacoes');
       state.transacoes = t ? JSON.parse(t.value) : [];
+      state.transacoes.forEach(tirarFreteDoComprador);   // vendas antigas da Shopee gravadas com o frete do comprador
     } catch (e) { state.transacoes = []; }
     try {
       var g = await window.storage.get('ml-gist-url');

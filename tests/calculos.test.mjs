@@ -569,3 +569,13 @@ test('mesmo produto em outro anúncio usa o custo do anúncio com o mesmo títul
   assert.equal(p.custoDoItem('MLB2').fonte, 'mesmo produto');
   assert.equal(p.custoDoItem('MLB3'), null, 'sem fio é outro produto');
 });
+
+test('Shopee: a venda vale o preço do produto, sem o frete que o comprador pagou', () => {
+  const p = painelBase();
+  p.state.transacoes = [];
+  const r = p.parseApiJson(JSON.stringify([{ id: 'SP1', tipo: 'venda', valor: 27.96, data: hoje() + 'T10:58:00-03:00',
+    itens: [{ item_id: 22795168205, titulo: 'Esponja', quantidade: 1, preco_unitario: 19.9 }], custos_shopee: { comissao: 3.6, taxa_servico: 4.88, liquido_recebido: 11.42 } }]), 'api-shopee-', 'Shopee');
+  const t = r.novas[0];
+  perto(t.valor, 19.9, 'preço do produto');
+  perto(t.freteComprador, 8.06, 'frete do comprador à parte');
+});
