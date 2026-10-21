@@ -556,3 +556,16 @@ test('peça na impressora entra na conta do que falta imprimir', () => {
   const x = p.calcPlanoImpressao().lista.find((l) => l.cor === 'preto');
   assert.equal(x.precisa, 4, '14 para 7 dias − 2 prontas − 8 na impressora');
 });
+
+test('mesmo produto em outro anúncio usa o custo do anúncio com o mesmo título', () => {
+  const p = painelBase();
+  p.state.custosAvulsos = { MLB1: 74 };
+  p.state.transacoes = [
+    { tipo: 'venda', data: hoje(), valor: 300, itens: [{ item_id: 'MLB1', titulo: 'Fone De Ouvido Lenovo Headset Estéreo Com Fio Usb-a', quantidade: 1 }] },
+    { tipo: 'venda', data: hoje(), valor: 333, itens: [{ item_id: 'MLB2', titulo: 'Fone De Ouvido Lenovo Headset Estéreo Com Fio Usb-a Gen 2 Preto', quantidade: 1 }] },
+    { tipo: 'venda', data: hoje(), valor: 219, itens: [{ item_id: 'MLB3', titulo: 'Fone De Ouvido Lenovo Headset Estéreo Sem Fio', quantidade: 1 }] },
+  ];
+  assert.equal(p.custoDoItem('MLB2').valor, 74);
+  assert.equal(p.custoDoItem('MLB2').fonte, 'mesmo produto');
+  assert.equal(p.custoDoItem('MLB3'), null, 'sem fio é outro produto');
+});

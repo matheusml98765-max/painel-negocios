@@ -25,8 +25,29 @@
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
     if (state.custosAvulsos[id] !== undefined && state.custosAvulsos[id] !== '') return { valor: Number(state.custosAvulsos[id]), fonte: 'avulso' };
+    // O mesmo produto vendido em outro anuncio (ex.: anuncio do catalogo e o seu proprio do ML):
+    // usa o custo do anuncio com o mesmo titulo.
+    var irmao = custoPorTitulo()[tituloDoItem(id)];
+    if (irmao !== undefined) return { valor: irmao, fonte: 'mesmo produto' };
     return null;
   }
+
+  function normTitulo(t) { return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 50); }
+  var _cacheTitulo = { chave: '', titulos: {}, custos: {} };
+  function indiceTitulos() {
+    var chave = (state.transacoes || []).length + ':' + Object.keys(state.custosAvulsos || {}).length;
+    if (_cacheTitulo.chave === chave) return _cacheTitulo;
+    var titulos = {}, custos = {};
+    (state.transacoes || []).forEach(function (t) { (t.itens || []).forEach(function (i) { var k = String(i.item_id || '').trim().toUpperCase(); if (k && i.titulo && !titulos[k]) titulos[k] = normTitulo(i.titulo); }); });
+    Object.keys(state.custosAvulsos || {}).forEach(function (k) {
+      var v = state.custosAvulsos[k], tt = titulos[String(k).toUpperCase()];
+      if (tt && v !== '' && v !== undefined && !isNaN(Number(v)) && custos[tt] === undefined) custos[tt] = Number(v);
+    });
+    _cacheTitulo = { chave: chave, titulos: titulos, custos: custos };
+    return _cacheTitulo;
+  }
+  function tituloDoItem(id) { return indiceTitulos().titulos[id] || '\u0000'; }
+  function custoPorTitulo() { return indiceTitulos().custos; }
 
   // Taxas reais de uma venda, vindas da automacao (ML ou Shopee). null = sem dados.
   function custosDaVenda(t) {
