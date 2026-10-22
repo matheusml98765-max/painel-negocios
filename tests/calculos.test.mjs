@@ -579,3 +579,14 @@ test('Shopee: a venda vale o preço do produto, sem o frete que o comprador pago
   perto(t.valor, 19.9, 'preço do produto');
   perto(t.freteComprador, 8.06, 'frete do comprador à parte');
 });
+
+test('imposto da Shopee sai sobre o produto + o frete que o comprador pagou (faturamento do Simples)', () => {
+  const p = painelBase();
+  p.state.configLucro.imposto = 4;
+  p.state.custosAvulsos = { 77: 5 };
+  p.state.transacoes = [{ tipo: 'venda', data: hoje(), valor: 19.9, freteComprador: 8.06, origemId: 'api-shopee-X-venda',
+    itens: [{ item_id: 77, quantidade: 1, preco_unitario: 19.9 }], custosShopee: { comissao: 3.6, taxa_servico: 4.88, liquido_recebido: 11.42 } }];
+  const r = p.calcVendasDoDia(hoje());
+  perto(r.vendas[0].valor, 19.9, 'venda = produto');
+  perto(r.vendas[0].imposto, (19.9 + 8.06) * 0.04, 'imposto com o frete');
+});

@@ -127,7 +127,7 @@
           if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
         } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;
-        if (!c.devolvido) g.receita += valor * parte;   // devolvida: a nota e cancelada, fica so o prejuizo
+        if (!c.devolvido) { g.receita += valor * parte; g.freteComprador = (g.freteComprador || 0) + (Number(t.freteComprador) || 0) * parte; }   // devolvida: a nota e cancelada, fica so o prejuizo
         g.comissao += c.comissaoPorItem ? (Number(i.comissao) || 0) : c.comissao * parte;
         g.frete += c.frete * parte;
         g.liquido += c.liquido * parte;
@@ -143,7 +143,8 @@
       var custo = g.semCusto ? null : { valor: g.unidades ? g.custoAcum / g.unidades : 0, fonte: g.fonteVenda };
       g.custoUnit = custo ? custo.valor : null;
       g.fonteCusto = custo ? custo.fonte : null;
-      g.imposto = g.receita * imposto;
+      // O frete pago pelo comprador na Shopee entra no faturamento do Simples (confirmado pelo contador em 22/10)
+      g.imposto = (g.receita + (g.freteComprador || 0)) * imposto;
       g.taxasMl = g.receita - g.liquido;
       g.precoMedio = g.unidades ? g.receita / g.unidades : 0;
       if (g.custoUnit !== null) {

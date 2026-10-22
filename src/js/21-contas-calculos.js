@@ -40,7 +40,7 @@
   // Vendas (ML + Shopee) de um mes, para estimar o DAS
   function faturamentoDoMes(m) {
     return (state.transacoes || []).reduce(function (s, t) {
-      return s + (t.tipo === 'venda' && String(t.data || '').slice(0, 7) === m ? (Number(t.valor) || 0) : 0);
+      return s + (t.tipo === 'venda' && String(t.data || '').slice(0, 7) === m ? (Number(t.valor) || 0) + (Number(t.freteComprador) || 0) : 0);   // faturamento do Simples inclui o frete pago pelo comprador
     }, 0);
   }
 

@@ -11,7 +11,7 @@
       if (t.tipo !== 'venda' || t.data !== dia) return;
       var c = custosDaVenda(t);
       var valor = Number(t.valor) || 0;
-      var v = { t: t, valor: valor, plataforma: c ? c.plataforma : (String(t.origemId || '').indexOf('shopee') !== -1 ? 'shopee' : 'ml'), taxas: null, frete: null, liquido: null, imposto: valor * imp, custo: 0, lucro: null, faltaCusto: [] };
+      var v = { t: t, valor: valor, plataforma: c ? c.plataforma : (String(t.origemId || '').indexOf('shopee') !== -1 ? 'shopee' : 'ml'), taxas: null, frete: null, liquido: null, imposto: (valor + (Number(t.freteComprador) || 0)) * imp, custo: 0, lucro: null, faltaCusto: [] };
       (t.itens || []).forEach(function (i) {
         var cu = custoDoItem(i.item_id, t.data);
         if (cu) v.custo += cu.valor * (Number(i.quantidade) || 1); else v.faltaCusto.push(i.titulo || i.item_id);
