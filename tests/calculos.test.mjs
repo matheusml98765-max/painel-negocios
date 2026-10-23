@@ -611,3 +611,18 @@ test('kit da Shopee vira N peças (custo e estoque contam as peças certas)', ()
   const r2 = p.parseApiJson(JSON.stringify([{ id: 'K4', tipo: 'venda', valor: 39.9, data: hoje() + 'T13:00:00-03:00', itens: [it[0]] }]), 'api-shopee-', 'Shopee');
   assert.equal(r2.novas[0].itens[0].quantidade, 2);
 });
+
+test('insumo só de uma plataforma: ML em caixa, Shopee no saco', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ id: 'a', data: '2026-01-01', nome: 'Caixa', qtd: 10, preco: 10, frete: 0 },
+                  { id: 'b', data: '2026-01-01', nome: 'Saco', qtd: 10, preco: 2, frete: 0 }];
+  c.produtos = [{ id: 'x', nome: 'Peça', tipo: 'PETG', gramas: 10, horas: 1, porPlaca: 1, anuncios: 'MLB9, 123',
+    insumos: [{ nome: 'Caixa', qtd: 1, so: 'ml' }, { nome: 'Saco', qtd: 1, so: 'shopee' }] }];
+  p.state.calc3d = c;
+  perto(p.custoPeca3d(c.produtos[0], '2026-10-01', 'ml').embalagem, 1, 'ML: caixa');
+  perto(p.custoPeca3d(c.produtos[0], '2026-10-01', 'shopee').embalagem, 0.2, 'Shopee: saco');
+  perto(p.custoPeca3d(c.produtos[0], '2026-10-01').embalagem, 0.2, 'sem plataforma = Shopee');
+  const ml = p.custo3dDoAnuncio('MLB9', '2026-10-01'), sh = p.custo3dDoAnuncio('123', '2026-10-01');
+  perto(ml - sh, 0.8, 'anúncio do ML usa a caixa');
+});

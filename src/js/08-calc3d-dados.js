@@ -98,12 +98,17 @@
 
   // Insumos que a peca usava na data (um insumo pode ter desde/ate quando a embalagem mudou,
   // para a troca nao mexer no custo nem no estoque das vendas antigas).
-  function insumosNaData(p, data) {
-    var d = data || isoHoje(0);
-    return (p.insumos || []).filter(function (s) { return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate); });
+  // plat: onde a peca foi vendida ('ml', 'shopee', 'tiktok'). Insumo com "so" vale so nessa plataforma
+  // (ex.: no ML vai em caixa com etiqueta de agradecimento; na Shopee, plastico + saco). Sem plat = Shopee.
+  function insumosNaData(p, data, plat) {
+    var d = data || isoHoje(0), pl = plat || 'shopee';
+    return (p.insumos || []).filter(function (s) {
+      return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate) && (!s.so || s.so === pl);
+    });
   }
+  function plataformaDoAnuncio(itemId) { return /^MLB/i.test(String(itemId || '').trim()) ? 'ml' : 'shopee'; }
 
-  function custoPeca3d(p, dataRef) {
+  function custoPeca3d(p, dataRef, plat) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
     var porPlaca = Math.max(1, num(p.porPlaca) || 1);
@@ -114,7 +119,7 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = insumosNaData(p, dataRef).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var emb = insumosNaData(p, dataRef, plat).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -131,6 +136,6 @@
       return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
     });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p, dataRef).total;
+    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id)).total;
   }
 

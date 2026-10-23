@@ -38,7 +38,7 @@
         if (chave.indexOf('fil:') === 0) {
           if ((p.tipo || '').toUpperCase() === chave.slice(4)) g = num(p.gramas) / Math.max(1, num(p.porPlaca) || 1) * q * perda;
         } else {
-          insumosNaData(p, t.data).forEach(function (s) { if (s.nome === chave.slice(4)) g += num(s.qtd) * q; });
+          insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id)).forEach(function (s) { if (s.nome === chave.slice(4)) g += num(s.qtd) * q; });
         }
         if (g > 0) uso[t.data] = (uso[t.data] || 0) + g;
       });

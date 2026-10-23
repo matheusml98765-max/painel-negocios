@@ -123,8 +123,11 @@
         sel.addEventListener('change', function () { it.nome = sel.value; salvarERender(); });
         var q = el('input', { type: 'number', step: '0.1', value: it.qtd, style: 'width:80px; padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field);' });
         q.addEventListener('change', function () { it.qtd = num(q.value); salvarERender(); });
+        var onde = el('select', { title: 'Em qual plataforma esse insumo vai junto', style: 'padding:6px 8px; border:1px solid var(--field-line); border-radius:7px; font-size:13px; background:var(--field); font-family:inherit;' },
+          [['', 'Todas'], ['shopee', 'Só Shopee'], ['ml', 'Só Mercado Livre']].map(function (o) { var op = el('option', { value: o[0], text: o[1] }); if ((it.so || '') === o[0]) op.setAttribute('selected', ''); return op; }));
+        onde.addEventListener('change', function () { if (onde.value) it.so = onde.value; else delete it.so; salvarERender(); });
         ins.appendChild(el('div', { style: 'display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;' }, [
-          sel, el('span', { class: 'pml-margin', text: '×' }), q,
+          sel, el('span', { class: 'pml-margin', text: '×' }), q, onde,
           semPreco ? el('span', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta o preço: cadastre a compra na seção 3' }) : el('span', { class: 'pml-margin', text: '= ' + fmtMoney(custoEmbalagem(it.nome) * num(it.qtd)) }),
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));
@@ -142,6 +145,10 @@
       bloco.appendChild(el('div', { class: 'pml-margin', style: 'margin-top:4px; line-height:1.8;' }, partes.map(function (x) {
         return el('span', { style: 'margin-right:14px; white-space:nowrap;', text: x[0] + ': ' + fmtMoney(x[1]) });
       })));
+      if (p.insumos.some(function (it) { return it.so; })) {
+        var cml = custoPeca3d(p, null, 'ml');
+        bloco.appendChild(el('div', { class: 'pml-margin', style: 'margin-top:4px;', text: 'Custo total: Shopee ' + fmtMoney(custo.total) + ' (embalagem ' + fmtMoney(custo.embalagem) + ') · Mercado Livre ' + fmtMoney(cml.total) + ' (embalagem ' + fmtMoney(cml.embalagem) + ')' }));
+      }
       bloco.appendChild(el('button', { class: 'pml-btn secondary', style: 'margin-top:8px;', text: 'Remover peça', onclick: function () { c.produtos = c.produtos.filter(function (x) { return x !== p; }); salvarERender(); } }));
       pc.appendChild(bloco);
     });
