@@ -590,3 +590,24 @@ test('imposto da Shopee sai sobre o produto + o frete que o comprador pagou (fat
   perto(r.vendas[0].valor, 19.9, 'venda = produto');
   perto(r.vendas[0].imposto, (19.9 + 8.06) * 0.04, 'imposto com o frete');
 });
+
+test('kit da Shopee vira N peças (custo e estoque contam as peças certas)', () => {
+  const p = painelBase();
+  const json = JSON.stringify([
+    { id: 'K1', tipo: 'venda', valor: 39.9, data: hoje() + 'T10:00:00-03:00', status: 'COMPLETED',
+      itens: [{ item_id: 23499389520, titulo: 'Suporte secador', variacao: 'Preto,Dupla Face - Kit 2', sku: 'SECADORPRETODF-K2', quantidade: 1, preco_unitario: 39.9 }] },
+    { id: 'K2', tipo: 'venda', valor: 36.9, data: hoje() + 'T11:00:00-03:00', status: 'COMPLETED',
+      itens: [{ item_id: 58216140538, titulo: 'Roteador', variacao: 'Preto 3 jogos', sku: 'SUPORTEROTEADORPRETO-K3', quantidade: 1, preco_unitario: 36.9 }] },
+    { id: 'K3', tipo: 'venda', valor: 23.9, data: hoje() + 'T12:00:00-03:00', status: 'COMPLETED',
+      itens: [{ item_id: 23499389520, titulo: 'Suporte secador', variacao: 'Preto,Dupla Face', sku: 'SECADORPRETODF', quantidade: 1, preco_unitario: 23.9 }] },
+  ]);
+  const r = p.parseApiJson(json, 'api-shopee-', 'Shopee');
+  const it = r.novas.map((t) => t.itens[0]);
+  assert.equal(it[0].quantidade, 2); perto(it[0].preco_unitario, 19.95, 'preço por peça do kit 2');
+  assert.equal(it[1].quantidade, 3);
+  assert.equal(it[2].quantidade, 1);
+  perto(r.novas[0].valor, 39.9, 'valor da venda não muda');
+  // segunda leitura do mesmo pedido não multiplica de novo
+  const r2 = p.parseApiJson(JSON.stringify([{ id: 'K4', tipo: 'venda', valor: 39.9, data: hoje() + 'T13:00:00-03:00', itens: [it[0]] }]), 'api-shopee-', 'Shopee');
+  assert.equal(r2.novas[0].itens[0].quantidade, 2);
+});

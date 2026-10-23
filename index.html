@@ -1507,6 +1507,32 @@
     return true;
   }
 
+  // Kits da Shopee (desde 22/10/2026): a variacao "Kit 2", "3 jogos" ou "+ Secador" e 1 unidade no pedido,
+  // mas sao 2, 3 ou 5 pecas. Aqui o item vira N pecas (quantidade x N, preco / N), assim o custo,
+  // o estoque e os insumos contam as pecas certas. O SKU do kit termina em -K2, -K3, -K5 ou -COMBO.
+  function unidadesDoKit(i) {
+    var sku = String(i.sku || '').toUpperCase();
+    var m = sku.match(/-K(\d+)$/);
+    if (m) return Number(m[1]);
+    if (/-COMBO$/.test(sku)) return 2;
+    var v = String(i.variacao || '');
+    m = v.match(/kit\s*(\d+)/i) || v.match(/(\d+)\s*jogos/i);
+    if (m) return Number(m[1]);
+    if (/\+\s*secador/i.test(v)) return 2;
+    return 1;
+  }
+  function expandirKits(itens) {
+    return itens.map(function (i) {
+      var n = unidadesDoKit(i);
+      if (n <= 1 || i.kit) return i;
+      var novo = Object.assign({}, i);
+      novo.kit = n;
+      novo.quantidade = (Number(i.quantidade) || 1) * n;
+      novo.preco_unitario = Math.round((Number(i.preco_unitario) || 0) / n * 10000) / 10000;
+      return novo;
+    });
+  }
+
   function parseApiJson(texto, origemPrefix, labelFonte) {
     origemPrefix = origemPrefix || 'api-ml-';
     labelFonte = labelFonte || 'Mercado Livre';
@@ -1517,6 +1543,7 @@
     try { dados = JSON.parse(texto); } catch (e) { return { novas: [], ignoradas: 0, atualizadas: 0, erro: true }; }
     if (!Array.isArray(dados)) return { novas: [], ignoradas: 0, atualizadas: 0, erro: true };
     dados.forEach(function (item, i) {
+      if (origemPrefix.indexOf('shopee') !== -1 && Array.isArray(item.itens)) item.itens = expandirKits(item.itens);
       var tipo = item.tipo;
       var valor = parseFloat(item.valor);
       var dataRaw = String(item.data || '').trim();
