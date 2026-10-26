@@ -111,6 +111,15 @@
   .pml-metric-value { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; margin: 0; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .pml-metric-value.pos { color: var(--good); }
   .pml-metric-value.neg { color: var(--bad); }
+  .pml-lojas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 10px; }
+  .pml-loja { border: 1px solid var(--line); border-top: 4px solid var(--s-ml); border-radius: var(--radius); padding: 14px 16px; }
+  .pml-loja-shopee { border-top-color: var(--s-shopee); }
+  .pml-loja-nome { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; margin: 0 0 10px; color: var(--ink); }
+  .pml-loja-linha { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px solid var(--line); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .pml-loja-linha:first-of-type { border-top: 0; }
+  .pml-loja-total { font-size: 15px; }
+  .pml-loja-total.pos b { color: var(--good); }
+  .pml-loja-total.neg b { color: var(--bad); }
   .pml-section-title { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--ink); letter-spacing: -0.01em; }
   .pml-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px; margin-bottom: 20px; box-shadow: var(--shadow); }
 

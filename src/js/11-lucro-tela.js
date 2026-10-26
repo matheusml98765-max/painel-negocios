@@ -61,6 +61,7 @@
       ]));
     }
     wrap.appendChild(metr);
+    if (plat === 'todas') renderLucroPorLoja(wrap, dias);
 
     // ---- Alertas ----
     var alertas = [];

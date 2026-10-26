@@ -626,3 +626,22 @@ test('insumo só de uma plataforma: ML em caixa, Shopee no saco', () => {
   const ml = p.custo3dDoAnuncio('MLB9', '2026-10-01'), sh = p.custo3dDoAnuncio('123', '2026-10-01');
   perto(ml - sh, 0.8, 'anúncio do ML usa a caixa');
 });
+
+test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
+  const p = painelBase();
+  p.state.custosAvulsos = { MLB1: 3, '2': 5 };
+  p.state.transacoes = [
+    { tipo: 'venda', data: hoje(), valor: 10, origemId: 'api-ml-1-venda', itens: [{ item_id: 'MLB1', quantidade: 1, preco_unitario: 10 }], custosMl: { comissao: 1, frete: 1, liquido_recebido: 8 } },
+    { tipo: 'venda', data: hoje(), valor: 20, origemId: 'api-shopee-2-venda', itens: [{ item_id: 2, quantidade: 1, preco_unitario: 20 }], custosShopee: { comissao: 4, taxa_servico: 4.5, liquido_recebido: 11.5 } },
+  ];
+  p.state.adsShopee = { dias: [{ data: hoje(), gasto: 2, vendas_ads: 20 }] };
+  p.state.anunciosMl = { ads: { dias: 30, por_item: { MLB1: { gasto: 30 } } } };
+  const [ml, sp] = p.calcLucroPorLoja(30);
+  assert.equal(ml.plataforma, 'ml');
+  perto(ml.lucro, 8 - 0.4 - 3, 'lucro ML');
+  perto(ml.ads, 30, 'Ads ML');
+  perto(ml.depoisAds, 8 - 0.4 - 3 - 30, 'ML depois do Ads');
+  perto(sp.lucro, 11.5 - 0.8 - 5, 'lucro Shopee');
+  perto(sp.depoisAds, 11.5 - 0.8 - 5 - 2, 'Shopee depois do Ads');
+  assert.equal(p.calcLucroPorLoja(7)[0].ads, 7, 'Ads do ML proporcional aos dias');
+});
