@@ -1525,7 +1525,9 @@
     if (m) return Number(m[1]);
     if (/-COMBO$/.test(sku)) return 2;
     var v = String(i.variacao || '');
-    m = v.match(/kit\s*(\d+)/i) || v.match(/(\d+)\s*jogos/i);
+    m = v.match(/kit\s*(\d+)/i);
+    // "3 jogos" e kit; "1 unidade (12 jogos)" e a capacidade do organizador, nao 12 pecas
+    if (!m && !/unidade|\(\s*\d+\s*jogos/i.test(v)) m = v.match(/(\d+)\s*jogos/i);
     if (m) return Number(m[1]);
     if (/\+\s*secador/i.test(v)) return 2;
     return 1;
@@ -1533,7 +1535,17 @@
   function expandirKits(itens) {
     return itens.map(function (i) {
       var n = unidadesDoKit(i);
-      if (n <= 1 || i.kit) return i;
+      if (i.kit) {
+        if (i.kit === n) return i;
+        // ja tinha sido multiplicado por uma regra antiga (ex.: "1 unidade (12 jogos)" virou 12): desfaz
+        var orig = Object.assign({}, i);
+        delete orig.kit;
+        orig.quantidade = Math.round((Number(i.quantidade) || i.kit) / i.kit);
+        orig.preco_unitario = Math.round((Number(i.preco_unitario) || 0) * i.kit * 100) / 100;
+        i = orig;
+        if (n <= 1) return i;
+      }
+      if (n <= 1) return i;
       var novo = Object.assign({}, i);
       novo.kit = n;
       novo.quantidade = (Number(i.quantidade) || 1) * n;

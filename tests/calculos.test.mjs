@@ -610,6 +610,15 @@ test('kit da Shopee vira N peças (custo e estoque contam as peças certas)', ()
   // segunda leitura do mesmo pedido não multiplica de novo
   const r2 = p.parseApiJson(JSON.stringify([{ id: 'K4', tipo: 'venda', valor: 39.9, data: hoje() + 'T13:00:00-03:00', itens: [it[0]] }]), 'api-shopee-', 'Shopee');
   assert.equal(r2.novas[0].itens[0].quantidade, 2);
+  // "1 unidade (12 jogos)" é a capacidade do organizador: 1 peça, não 12
+  const org = { item_id: 58271093530, titulo: 'Organizador Switch', variacao: '1 unidade (12 jogos),Preto', sku: 'SWORG', quantidade: 1, preco_unitario: 29.9 };
+  const r3 = p.parseApiJson(JSON.stringify([{ id: 'K5', tipo: 'venda', valor: 29.9, data: hoje() + 'T14:00:00-03:00', itens: [org] }]), 'api-shopee-', 'Shopee');
+  assert.equal(r3.novas[0].itens[0].quantidade, 1);
+  // pedido já salvo com a regra antiga (12 peças) volta para 1
+  const velho = Object.assign({}, org, { kit: 12, quantidade: 12, preco_unitario: 2.4917 });
+  const r4 = p.parseApiJson(JSON.stringify([{ id: 'K6', tipo: 'venda', valor: 29.9, data: hoje() + 'T15:00:00-03:00', itens: [velho] }]), 'api-shopee-', 'Shopee');
+  assert.equal(r4.novas[0].itens[0].quantidade, 1);
+  perto(r4.novas[0].itens[0].preco_unitario, 29.9, 'preço volta ao do pedido');
 });
 
 test('insumo só de uma plataforma: ML em caixa, Shopee no saco', () => {
