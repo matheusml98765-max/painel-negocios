@@ -654,3 +654,17 @@ test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
   perto(sp.depoisAds, 11.5 - 0.8 - 5 - 2, 'Shopee depois do Ads');
   assert.equal(p.calcLucroPorLoja(7)[0].ads, 7, 'Ads do ML proporcional aos dias');
 });
+
+test('vendas do dia: escolher a loja mostra só as vendas dela', () => {
+  const p = painelBase();
+  p.state.transacoes = [
+    { tipo: 'venda', data: hoje(), valor: 10, origemId: 'api-ml-1-venda', itens: [{ item_id: 'MLB1', quantidade: 1, preco_unitario: 10 }], custosMl: { comissao: 1, frete: 1, liquido_recebido: 8 } },
+    { tipo: 'venda', data: hoje(), valor: 20, origemId: 'api-shopee-2-venda', itens: [{ item_id: 2, quantidade: 1, preco_unitario: 20 }], custosShopee: { comissao: 4, taxa_servico: 4.5, liquido_recebido: 11.5 } },
+  ];
+  p.state.adsShopee = { dias: [{ data: hoje(), gasto: 3 }] };
+  assert.equal(p.calcVendasDoDia(hoje()).vendas.length, 2);
+  const ml = p.calcVendasDoDia(hoje(), 'ml');
+  assert.equal(ml.vendas.length, 1); perto(ml.bruto, 10, 'bruto ML'); assert.equal(ml.ads, null, 'Ads da Shopee não entra no ML');
+  const sp = p.calcVendasDoDia(hoje(), 'shopee');
+  assert.equal(sp.vendas.length, 1); perto(sp.bruto, 20, 'bruto Shopee'); perto(sp.ads, 3, 'Ads Shopee');
+});

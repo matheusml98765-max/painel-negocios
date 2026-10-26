@@ -111,6 +111,8 @@
   .pml-metric-value { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; margin: 0; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .pml-metric-value.pos { color: var(--good); }
   .pml-metric-value.neg { color: var(--bad); }
+  .pml-lojas-filtro { display: inline-flex; gap: 4px; }
+  .pml-lojas-filtro .pml-btn.ativo { border-color: var(--accent); color: var(--ink); font-weight: 700; }
   .pml-lojas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 10px; }
   .pml-loja { border: 1px solid var(--line); border-top: 4px solid var(--s-ml); border-radius: var(--radius); padding: 14px 16px; }
   .pml-loja-shopee { border-top-color: var(--s-shopee); }
