@@ -6233,9 +6233,12 @@
     return Object.keys(ml.por_item).reduce(function (s, id) { return s + (Number(ml.por_item[id].gasto) || 0); }, 0) * (dias / base);
   }
 
+  // Parte da conta de todas as lojas juntas e separa por plataforma: assim as perdas com falhas
+  // de impressao sao divididas entre as lojas uma vez so, e a soma bate com o total da aba.
   function calcLucroPorLoja(dias) {
+    var todas = calcLucroPorProduto(dias, 'todas').linhas;
     return ['ml', 'shopee'].map(function (plat) {
-      var linhas = calcLucroPorProduto(dias, plat).linhas;
+      var linhas = todas.filter(function (g) { return g.plataforma === plat; });
       var t = linhas.reduce(function (a, g) {
         a.receita += g.receita; a.liquido += g.liquido; a.unidades += g.unidades; a.imposto += g.imposto;
         if (g.lucro !== null) { a.lucro += g.lucro; a.receitaComCusto += g.receita; } else a.semCusto++;
