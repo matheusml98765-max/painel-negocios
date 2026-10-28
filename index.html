@@ -4811,10 +4811,23 @@
   }
 
   // ---------------- Card na Calculadora 3D ----------------
+  // Na falha so se perde a peca impressa lisa (sem fita nem parafuso): as versoes dupla face e
+  // parafuso da mesma peca (mesmos gramas) viram uma opcao so, com o nome sem a versao.
+  function nomeLiso(nome) { return String(nome || '').replace(/\s*[—–-]\s*(dupla face|parafuso)\s*$/i, '').trim(); }
+  function pecasLisas() {
+    var vistas = {};
+    return (getCalc3d().produtos || []).filter(function (p) {
+      if (!(num(p.gramas) > 0)) return false;
+      var k = nomeLiso(p.nome).toLowerCase() + '|' + num(p.gramas) + '|' + num(p.porPlaca || 1);
+      if (vistas[k]) return false;
+      vistas[k] = true; return true;
+    });
+  }
+
   function formFalha(aoSalvar) {
-    var pecas = (getCalc3d().produtos || []).filter(function (p) { return num(p.gramas) > 0; });
+    var pecas = pecasLisas();
     var data = el('input', { type: 'date', value: isoHoje(0) });
-    var peca = el('select', {}, pecas.map(function (p) { return el('option', { value: p.id, text: p.nome }); }));
+    var peca = el('select', {}, pecas.map(function (p) { return el('option', { value: p.id, text: nomeLiso(p.nome) }); }));
     var qtd = el('input', { type: 'number', min: '1', step: '1', value: '1', style: 'width:80px;' });
     var pct = el('input', { type: 'number', min: '0', max: '100', step: '1', placeholder: 'ex.: 10', style: 'width:90px;' });
     var obs = el('input', { placeholder: 'opcional: o que aconteceu' });
@@ -4846,7 +4859,7 @@
       var t = el('table', { class: 'pml-table', style: 'margin-top:10px;' });
       t.appendChild(el('tr', {}, ['Dia', 'Peça', 'Qtd', 'Parou em', 'Filamento', 'Perda', ''].map(function (h, i) { return el('th', { class: i > 1 && i < 6 ? 'num' : '', text: h }); })));
       fa.lista.forEach(function (x) {
-        t.appendChild(el('tr', {}, [el('td', { text: x.f.data.split('-').reverse().join('/') }), el('td', { text: x.c.peca.nome + (x.f.obs ? ' · ' + x.f.obs : '') }), el('td', { class: 'num', text: String(x.f.qtd) }), el('td', { class: 'num', text: num(x.f.pct) + '%' }),
+        t.appendChild(el('tr', {}, [el('td', { text: x.f.data.split('-').reverse().join('/') }), el('td', { text: nomeLiso(x.c.peca.nome) + (x.f.obs ? ' · ' + x.f.obs : '') }), el('td', { class: 'num', text: String(x.f.qtd) }), el('td', { class: 'num', text: num(x.f.pct) + '%' }),
           el('td', { class: 'num', text: x.c.gramas.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' g' }), el('td', { class: 'num', text: fmtMoney(x.c.total) }),
           el('td', {}, [el('button', { class: 'tarefa-x', title: 'Excluir', text: '×', onclick: function () { excluir(x.f.id); } })])]));
       });
