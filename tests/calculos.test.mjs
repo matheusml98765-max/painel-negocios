@@ -668,3 +668,17 @@ test('vendas do dia: escolher a loja mostra só as vendas dela', () => {
   const sp = p.calcVendasDoDia(hoje(), 'shopee');
   assert.equal(sp.vendas.length, 1); perto(sp.bruto, 20, 'bruto Shopee'); perto(sp.ads, 3, 'Ads Shopee');
 });
+
+test('TikTok Shop: 10% + R$ 4 abaixo de R$ 50, 6% + R$ 6 a partir de R$ 50, mais 6% do programa de frete', () => {
+  const p = painelBase();
+  perto(p.taxasPlataforma('tiktok', 30).valor, 30 * 0.16 + 4, 'R$ 30');
+  perto(p.taxasPlataforma('tiktok', 49.9).valor, 49.9 * 0.16 + 4, 'R$ 49,90');
+  perto(p.taxasPlataforma('tiktok', 50).valor, 50 * 0.12 + 6, 'R$ 50');
+  perto(p.taxasPlataforma('tiktok', 80).valor, 80 * 0.12 + 6, 'R$ 80');
+});
+
+test('TikTok Shop: custos salvos antes da mudança ganham a faixa de R$ 50 e o frete de 6%', () => {
+  const p = painelBase();
+  p.state.calc3d = { produtos: [], plataformas: [{ id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, frete: 0, ads: 0 }] };
+  perto(p.taxasPlataforma('tiktok', 60).valor, 60 * 0.12 + 6, 'R$ 60');
+});

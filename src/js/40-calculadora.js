@@ -23,7 +23,7 @@
       return { valor: preco * r, pct: r, fonte: 'real', amostra: razoes.length };
     }
     var cfg = (getCalc3d().plataformas || []).find(function (p) { return p.id === plat; }) || {};
-    var v2 = preco * num(cfg.comissao) / 100 + num(cfg.taxaFixa) + num(cfg.frete);
+    var v2 = taxaTabela(cfg, preco);
     return { valor: v2, pct: preco ? v2 / preco : 0, fonte: 'tabela', amostra: razoes.length };
   }
 

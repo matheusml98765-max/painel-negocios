@@ -4,8 +4,23 @@
     return [
       { id: 'shopee', nome: 'Shopee', comissao: 20, taxaFixa: 4.5, frete: 0, ads: 15.5, nota: 'Nas suas vendas reais: cerca de 18,6% de comissão + 1,4% de serviço + R$ 4,50 fixos por pedido. Afiliados cobram à parte quando a venda vem deles.' },
       { id: 'ml', nome: 'Mercado Livre', comissao: 12, taxaFixa: 6.5, frete: 5, ads: 0, nota: 'Abaixo de R$ 79 o ML cobra tarifa por unidade e frete por peso — use os números reais da aba Lucro por produto.' },
-      { id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, frete: 0, ads: 0, nota: 'Abaixo de R$ 50: 10% + R$ 4 por item (desde 15/07/2026).' }
+      tiktokPadrao()
     ];
+  }
+
+  // TikTok Shop: abaixo de R$ 50 cobra 10% + R$ 4 por item; a partir de R$ 50, 6% + R$ 6.
+  // Mais 6% do programa de frete (a loja está inscrita) em qualquer preço.
+  var NOTA_TIKTOK = 'Abaixo de R$ 50: 10% + R$ 4 por item; a partir de R$ 50: 6% + R$ 6. Mais 6% do programa de frete em todas as vendas.';
+  function tiktokPadrao() {
+    return { id: 'tiktok', nome: 'TikTok Shop', comissao: 10, taxaFixa: 4, limiteFaixa: 50, comissaoAcima: 6, taxaFixaAcima: 6, fretePct: 6, frete: 0, ads: 0, nota: NOTA_TIKTOK };
+  }
+
+  // Quanto a plataforma fica numa venda a esse preço, pelas taxas cadastradas (sem vendas reais).
+  function taxaTabela(cfg, preco) {
+    var acima = num(cfg.limiteFaixa) > 0 && preco >= num(cfg.limiteFaixa);
+    var pct = acima ? num(cfg.comissaoAcima) : num(cfg.comissao);
+    var fixa = acima ? num(cfg.taxaFixaAcima) : num(cfg.taxaFixa);
+    return preco * (pct + num(cfg.fretePct)) / 100 + fixa + num(cfg.frete);
   }
 
   function calc3dPadrao() {
@@ -26,6 +41,9 @@
     if (!state.calc3d) state.calc3d = calc3dPadrao();
     var c = state.calc3d;
     if (!Array.isArray(c.plataformas)) c.plataformas = plataformasPadrao();
+    var tk = c.plataformas.find(function (p) { return p.id === 'tiktok'; });
+    if (!tk) c.plataformas.push(tiktokPadrao());
+    else if (tk.limiteFaixa === undefined) Object.assign(tk, { limiteFaixa: 50, comissaoAcima: 6, taxaFixaAcima: 6, fretePct: 6, nota: NOTA_TIKTOK });   // custos salvos antes da faixa de R$ 50 e do programa de frete
     if (c.imposto === undefined) c.imposto = (c.simulador && c.simulador.imposto !== undefined) ? c.simulador.imposto : 4;
     c.produtos.forEach(function (p) {
       if (!Array.isArray(p.insumos)) {
