@@ -43,6 +43,8 @@
       renderMeuDia(wrap);
     } else if (state.tab === 'conquistas') {
       renderConquistasTab(wrap);
+    } else if (state.tab === 'ofertas') {
+      renderOfertasTab(wrap);
     } else if (state.tab === 'receber') {
       renderReceberTab(wrap);
     } else if (state.tab === 'cpf') {
@@ -63,7 +65,7 @@
 
   // Link direto para uma aba (ex.: .../painel-negocios/#relatorio, usado no aviso do Telegram)
   var abaDoLink = (location.hash || '').replace('#', '');
-  if (['dia', 'geral', 'lucro', 'calc3d', 'producao3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
+  if (['dia', 'geral', 'lucro', 'calc3d', 'producao3d', 'estoque', 'financeiro', 'relatorio', 'calendario', 'tarefas', 'contas', 'receber', 'cpf', 'conquistas', 'ofertas', 'importar'].indexOf(abaDoLink) !== -1) state.tab = abaDoLink;
 
   if (!abaDoLink || /[?&]bomdia=1/.test(location.search)) abrirMeuDiaHoje();
   mostrarIntro();
