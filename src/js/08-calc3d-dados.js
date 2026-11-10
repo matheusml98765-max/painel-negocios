@@ -118,15 +118,19 @@
   // para a troca nao mexer no custo nem no estoque das vendas antigas).
   // plat: onde a peca foi vendida ('ml', 'shopee', 'tiktok'). Insumo com "so" vale so nessa plataforma
   // (ex.: no ML vai em caixa com etiqueta de agradecimento; na Shopee, plastico + saco). Sem plat = Shopee.
-  function insumosNaData(p, data, plat) {
-    var d = data || isoHoje(0), pl = plat || 'shopee';
+  // kit: quantas pecas o pedido tinha (kit de 2 da Shopee = 2). Insumo com "kit": N vale so nas
+  // pecas vendidas em kit de N (ex.: 1 caixa 20x20x20 para 2 pecas = 0,5 por peca); com "foraDoKit": N
+  // vale em todas as vendas menos no kit de N (a caixa individual nao vai no kit).
+  function insumosNaData(p, data, plat, kit) {
+    var d = data || isoHoje(0), pl = plat || 'shopee', k = Number(kit) || 1;
     return (p.insumos || []).filter(function (s) {
-      return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate) && (!s.so || s.so === pl);
+      return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate) && (!s.so || s.so === pl) &&
+        (!s.kit || Number(s.kit) === k) && (!s.foraDoKit || Number(s.foraDoKit) !== k);
     });
   }
   function plataformaDoAnuncio(itemId) { return /^MLB/i.test(String(itemId || '').trim()) ? 'ml' : 'shopee'; }
 
-  function custoPeca3d(p, dataRef, plat) {
+  function custoPeca3d(p, dataRef, plat, kit) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
     var porPlaca = Math.max(1, num(p.porPlaca) || 1);
@@ -137,7 +141,7 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = insumosNaData(p, dataRef, plat).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var emb = insumosNaData(p, dataRef, plat, kit).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -147,13 +151,13 @@
   }
 
   // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro por produto)
-  function custo3dDoAnuncio(itemId, dataRef) {
+  function custo3dDoAnuncio(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
     var p = state.calc3d.produtos.find(function (x) {
       return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
     });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id)).total;
+    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit).total;
   }
 

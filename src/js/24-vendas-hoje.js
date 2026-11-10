@@ -16,7 +16,7 @@
       if (plat && plat !== 'todas' && platVenda !== plat) return;
       var v = { t: t, valor: valor, plataforma: platVenda, taxas: null, frete: null, liquido: null, imposto: (valor + (Number(t.freteComprador) || 0)) * imp, custo: 0, lucro: null, faltaCusto: [] };
       (t.itens || []).forEach(function (i) {
-        var cu = custoDoItem(i.item_id, t.data);
+        var cu = custoDoItem(i.item_id, t.data, i.kit);
         if (cu) v.custo += cu.valor * (Number(i.quantidade) || 1); else v.faltaCusto.push(i.titulo || i.item_id);
       });
       if (c) { v.taxas = c.comissao; v.frete = c.frete; v.liquido = c.liquido; }

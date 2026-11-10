@@ -2215,15 +2215,19 @@
   // para a troca nao mexer no custo nem no estoque das vendas antigas).
   // plat: onde a peca foi vendida ('ml', 'shopee', 'tiktok'). Insumo com "so" vale so nessa plataforma
   // (ex.: no ML vai em caixa com etiqueta de agradecimento; na Shopee, plastico + saco). Sem plat = Shopee.
-  function insumosNaData(p, data, plat) {
-    var d = data || isoHoje(0), pl = plat || 'shopee';
+  // kit: quantas pecas o pedido tinha (kit de 2 da Shopee = 2). Insumo com "kit": N vale so nas
+  // pecas vendidas em kit de N (ex.: 1 caixa 20x20x20 para 2 pecas = 0,5 por peca); com "foraDoKit": N
+  // vale em todas as vendas menos no kit de N (a caixa individual nao vai no kit).
+  function insumosNaData(p, data, plat, kit) {
+    var d = data || isoHoje(0), pl = plat || 'shopee', k = Number(kit) || 1;
     return (p.insumos || []).filter(function (s) {
-      return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate) && (!s.so || s.so === pl);
+      return (!s.desde || d >= s.desde) && (!s.ate || d <= s.ate) && (!s.so || s.so === pl) &&
+        (!s.kit || Number(s.kit) === k) && (!s.foraDoKit || Number(s.foraDoKit) !== k);
     });
   }
   function plataformaDoAnuncio(itemId) { return /^MLB/i.test(String(itemId || '').trim()) ? 'ml' : 'shopee'; }
 
-  function custoPeca3d(p, dataRef, plat) {
+  function custoPeca3d(p, dataRef, plat, kit) {
     var c = getCalc3d();
     var imp = c.impressoras.find(function (i) { return i.id === p.impressoraId; }) || c.impressoras[0] || { watts: 0, preco: 0, vidaHoras: 1 };
     var porPlaca = Math.max(1, num(p.porPlaca) || 1);
@@ -2234,7 +2238,7 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = insumosNaData(p, dataRef, plat).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var emb = insumosNaData(p, dataRef, plat, kit).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
@@ -2244,14 +2248,14 @@
   }
 
   // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro por produto)
-  function custo3dDoAnuncio(itemId, dataRef) {
+  function custo3dDoAnuncio(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
     var p = state.calc3d.produtos.find(function (x) {
       return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
     });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id)).total;
+    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit).total;
   }
 
   function renderCalc3dTab(wrap) {
@@ -2384,6 +2388,7 @@
         onde.addEventListener('change', function () { if (onde.value) it.so = onde.value; else delete it.so; salvarERender(); });
         ins.appendChild(el('div', { style: 'display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;' }, [
           sel, el('span', { class: 'pml-margin', text: '×' }), q, onde,
+          it.kit ? el('span', { class: 'pml-margin', text: 'só no kit de ' + it.kit + ' (por peça)' }) : (it.foraDoKit ? el('span', { class: 'pml-margin', text: 'menos no kit de ' + it.foraDoKit }) : null),
           semPreco ? el('span', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta o preço: cadastre a compra na seção 3' }) : el('span', { class: 'pml-margin', text: '= ' + fmtMoney(custoEmbalagem(it.nome) * num(it.qtd)) }),
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));
@@ -2435,9 +2440,9 @@
   }
 
   // dataRef (opcional): data da venda, para a peca 3D usar o preco das compras daquela epoca.
-  function custoDoItem(itemId, dataRef) {
+  function custoDoItem(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
-    var c3d = custo3dDoAnuncio(id, dataRef);
+    var c3d = custo3dDoAnuncio(id, dataRef, kit);
     if (c3d !== null) return { valor: c3d, fonte: '3d' };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
@@ -2540,7 +2545,7 @@
         // Devolvida (o comprador recebeu o dinheiro de volta): o produto voltou, entao nao entra no custo
         if (!c.devolvido) {
           g.unidades += qtd;
-          var cv = custoDoItem(id, t.data);
+          var cv = custoDoItem(id, t.data, i.kit);
           if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
         } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;
@@ -3773,7 +3778,7 @@
         var e = r.pecas[p.id] || (r.pecas[p.id] = { nome: p.nome, unidades: 0, horas: 0, gramas: 0, kwh: 0 });
         e.unidades += qtd; e.horas += h; e.gramas += num(p.gramas) / porPlaca * qtd * perda; e.kwh += kwh;
         r.unidades += qtd; r.horas += h; r.gramas += num(p.gramas) / porPlaca * qtd * perda; r.kwh += kwh;
-        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id)).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
+        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id), i.kit).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
       });
     });
     if (typeof falhasNoPeriodo === 'function') {
@@ -3806,7 +3811,7 @@
       if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data || t.data < ini) return;
       t.itens.forEach(function (i) {
         var p = pecaDoItem(i.item_id);
-        if (p) insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id)).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1); });
+        if (p) insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id), i.kit).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1); });
       });
     });
     return itens.map(function (it) {
@@ -4594,7 +4599,7 @@
       if (plat && plat !== 'todas' && platVenda !== plat) return;
       var v = { t: t, valor: valor, plataforma: platVenda, taxas: null, frete: null, liquido: null, imposto: (valor + (Number(t.freteComprador) || 0)) * imp, custo: 0, lucro: null, faltaCusto: [] };
       (t.itens || []).forEach(function (i) {
-        var cu = custoDoItem(i.item_id, t.data);
+        var cu = custoDoItem(i.item_id, t.data, i.kit);
         if (cu) v.custo += cu.valor * (Number(i.quantidade) || 1); else v.faltaCusto.push(i.titulo || i.item_id);
       });
       if (c) { v.taxas = c.comissao; v.frete = c.frete; v.liquido = c.liquido; }

@@ -128,6 +128,7 @@
         onde.addEventListener('change', function () { if (onde.value) it.so = onde.value; else delete it.so; salvarERender(); });
         ins.appendChild(el('div', { style: 'display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap;' }, [
           sel, el('span', { class: 'pml-margin', text: '×' }), q, onde,
+          it.kit ? el('span', { class: 'pml-margin', text: 'só no kit de ' + it.kit + ' (por peça)' }) : (it.foraDoKit ? el('span', { class: 'pml-margin', text: 'menos no kit de ' + it.foraDoKit }) : null),
           semPreco ? el('span', { class: 'pml-margin', style: 'color:var(--warn);', text: 'falta o preço: cadastre a compra na seção 3' }) : el('span', { class: 'pml-margin', text: '= ' + fmtMoney(custoEmbalagem(it.nome) * num(it.qtd)) }),
           el('button', { class: 'pml-btn secondary', text: '✕', onclick: function () { p.insumos.splice(p.insumos.indexOf(it), 1); salvarERender(); } })
         ]));

@@ -18,9 +18,9 @@
   }
 
   // dataRef (opcional): data da venda, para a peca 3D usar o preco das compras daquela epoca.
-  function custoDoItem(itemId, dataRef) {
+  function custoDoItem(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
-    var c3d = custo3dDoAnuncio(id, dataRef);
+    var c3d = custo3dDoAnuncio(id, dataRef, kit);
     if (c3d !== null) return { valor: c3d, fonte: '3d' };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
@@ -123,7 +123,7 @@
         // Devolvida (o comprador recebeu o dinheiro de volta): o produto voltou, entao nao entra no custo
         if (!c.devolvido) {
           g.unidades += qtd;
-          var cv = custoDoItem(id, t.data);
+          var cv = custoDoItem(id, t.data, i.kit);
           if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
         } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;

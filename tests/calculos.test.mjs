@@ -636,6 +636,21 @@ test('insumo só de uma plataforma: ML em caixa, Shopee no saco', () => {
   perto(ml - sh, 0.8, 'anúncio do ML usa a caixa');
 });
 
+test('kit de 2: caixa grande dividida entre as peças, sem a caixa individual', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ id: 'a', data: '2026-01-01', nome: 'Caixa P', qtd: 10, preco: 10, frete: 0 },
+                  { id: 'b', data: '2026-01-01', nome: 'Caixa G', qtd: 10, preco: 20, frete: 0 }];
+  c.produtos = [{ id: 'x', nome: 'Peça', tipo: 'PETG', gramas: 10, horas: 1, porPlaca: 1, anuncios: '123',
+    insumos: [{ nome: 'Caixa P', qtd: 1, foraDoKit: 2 }, { nome: 'Caixa G', qtd: 0.5, kit: 2 }] }];
+  p.state.calc3d = c;
+  perto(p.custoPeca3d(c.produtos[0], '2026-11-01', 'shopee').embalagem, 1, 'avulsa: caixa P');
+  perto(p.custoPeca3d(c.produtos[0], '2026-11-01', 'shopee', 2).embalagem, 1, 'kit 2: metade da caixa G por peça');
+  perto(p.custoPeca3d(c.produtos[0], '2026-11-01', 'shopee', 3).embalagem, 1, 'kit 3: caixa P');
+  c.embalagens[1].preco = 30;
+  perto(p.custo3dDoAnuncio('123', '2026-11-01', 2) - p.custo3dDoAnuncio('123', '2026-11-01'), 0.5, 'custo do anúncio segue o kit');
+});
+
 test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
   const p = painelBase();
   p.state.custosAvulsos = { MLB1: 3, '2': 5 };
