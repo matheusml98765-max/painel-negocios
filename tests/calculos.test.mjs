@@ -651,6 +651,19 @@ test('kit de 2: caixa grande dividida entre as peças, sem a caixa individual', 
   perto(p.custo3dDoAnuncio('123', '2026-11-01', 2) - p.custo3dDoAnuncio('123', '2026-11-01'), 0.5, 'custo do anúncio segue o kit');
 });
 
+test('anúncio de kit fixo no ML (MLB1x2): custo de 2 peças com a caixa do kit', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ id: 'a', data: '2026-01-01', nome: 'Caixa P', qtd: 10, preco: 10, frete: 0 },
+                  { id: 'b', data: '2026-01-01', nome: 'Caixa G', qtd: 10, preco: 30, frete: 0 }];
+  c.produtos = [{ id: 'x', nome: 'Peça', tipo: 'PETG', gramas: 10, horas: 1, porPlaca: 1, anuncios: 'MLB1, MLB2x2',
+    insumos: [{ nome: 'Caixa P', qtd: 1, foraDoKit: 2 }, { nome: 'Caixa G', qtd: 0.5, kit: 2 }] }];
+  p.state.calc3d = c;
+  const um = p.custo3dDoAnuncio('MLB1', '2026-11-01'), kit = p.custo3dDoAnuncio('MLB2', '2026-11-01');
+  perto(kit - 2 * um, 1, 'kit = 2 peças, com 1 caixa G (3) no lugar de 2 caixas P (2)');
+  assert.equal(p.custo3dDoAnuncio('MLB2X2'), null, 'o sufixo não vira outro anúncio');
+});
+
 test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
   const p = painelBase();
   p.state.custosAvulsos = { MLB1: 3, '2': 5 };

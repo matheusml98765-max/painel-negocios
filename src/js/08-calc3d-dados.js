@@ -150,14 +150,29 @@
     };
   }
 
+  // Anuncio que vende um kit fixo (ex.: no ML "Kit 2 Unidades" e 1 unidade do anuncio = 2 pecas):
+  // na peca ele entra como "MLB123x2". Devolve quantas pecas vao em cada unidade vendida (0 = nao e dessa peca).
+  function pecasPorUnidade(p, itemId) {
+    var id = String(itemId || '').trim().toUpperCase(), n = 0;
+    if (!id) return 0;
+    String(p.anuncios || '').toUpperCase().split(/[\s,;]+/).some(function (tok) {
+      var m = tok.match(/^(.+?)(?:[X*](\d+))?$/);
+      if (m && m[1] === id) { n = m[2] ? Number(m[2]) : 1; return true; }
+      return false;
+    });
+    return n;
+  }
+  function idsDosAnuncios(p) {
+    return String(p.anuncios || '').toUpperCase().split(/[\s,;]+/).filter(Boolean).map(function (tok) { return tok.replace(/[X*]\d+$/, ''); });
+  }
+
   // Custo de um anuncio vindo da calculadora 3D (usado pela aba Lucro por produto)
   function custo3dDoAnuncio(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
-    var p = state.calc3d.produtos.find(function (x) {
-      return String(x.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
-    });
+    var n = 0;
+    var p = state.calc3d.produtos.find(function (x) { n = pecasPorUnidade(x, id); return n > 0; });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit).total;
+    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit || (n > 1 ? n : undefined)).total * n;
   }
 

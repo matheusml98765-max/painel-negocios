@@ -111,7 +111,7 @@
         campo('Peças por impressão', inputNum(p, 'porPlaca', '1')),
         campo('Impressora', selImp),
         campo('Extras por peça (R$)', inputNum(p, 'extras', '0.01'), 'Parafuso, fita, etiqueta...'),
-        campo('Anúncios (ML ou Shopee)', inputTxt(p, 'anuncios', 'MLB123, 22894922420'))
+        campo('Anúncios (ML ou Shopee)', inputTxt(p, 'anuncios', 'MLB123, 22894922420, MLB456x2 (kit de 2)'))
       ]));
       var ins = el('div', { style: 'margin:6px 0 4px;' }, [el('div', { class: 'pml-metric-label', style: 'margin-bottom:6px;', text: 'Embalagem e insumos usados por peça' })]);
       var antigos = p.insumos.filter(function (it) { return it.ate && it.ate < isoHoje(0); });

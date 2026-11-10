@@ -6,9 +6,7 @@
   function pecaDoItem(itemId) {
     var id = String(itemId || '').trim().toUpperCase();
     if (!id || !state.calc3d) return null;
-    return (state.calc3d.produtos || []).find(function (p) {
-      return String(p.anuncios || '').toUpperCase().split(/[\s,;]+/).indexOf(id) !== -1;
-    }) || null;
+    return (state.calc3d.produtos || []).find(function (p) { return pecasPorUnidade(p, id) > 0; }) || null;
   }
 
   // Pecas 3D vendidas no intervalo (de/ate 'AAAA-MM-DD'), com horas, gramas e kWh.
@@ -21,7 +19,9 @@
       t.itens.forEach(function (i) {
         var p = pecaDoItem(i.item_id);
         if (!p) return;
-        var qtd = Number(i.quantidade) || 1;
+        var nKit = pecasPorUnidade(p, i.item_id);
+        var qtd = (Number(i.quantidade) || 1) * nKit;
+        var kitVenda = i.kit || (nKit > 1 ? nKit : undefined);
         var imp = c.impressoras.find(function (x) { return x.id === p.impressoraId; }) || c.impressoras[0] || { watts: 100 };
         var porPlaca = Math.max(1, num(p.porPlaca) || 1);
         var h = num(p.horas) / porPlaca * qtd * perda;
@@ -29,7 +29,7 @@
         var e = r.pecas[p.id] || (r.pecas[p.id] = { nome: p.nome, unidades: 0, horas: 0, gramas: 0, kwh: 0 });
         e.unidades += qtd; e.horas += h; e.gramas += num(p.gramas) / porPlaca * qtd * perda; e.kwh += kwh;
         r.unidades += qtd; r.horas += h; r.gramas += num(p.gramas) / porPlaca * qtd * perda; r.kwh += kwh;
-        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id), i.kit).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
+        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id), kitVenda).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
       });
     });
     if (typeof falhasNoPeriodo === 'function') {
@@ -62,7 +62,7 @@
       if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data || t.data < ini) return;
       t.itens.forEach(function (i) {
         var p = pecaDoItem(i.item_id);
-        if (p) insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id), i.kit).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1); });
+        if (p) { var nK = pecasPorUnidade(p, i.item_id); insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id), i.kit || (nK > 1 ? nK : undefined)).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1) * nK; }); }
       });
     });
     return itens.map(function (it) {

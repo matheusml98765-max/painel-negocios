@@ -174,7 +174,7 @@
     (c.produtos || []).forEach(function (p) {
       if (!(num(p.gramas) > 0) || !p.anuncios) return;
       pecasLigadas++;
-      String(p.anuncios).toUpperCase().split(/[\s,;]+/).forEach(function (id) { if (id) gramas30 += (u[id] || 0) * num(p.gramas); });
+      idsDosAnuncios(p).forEach(function (id) { gramas30 += (u[id] || 0) * num(p.gramas) * pecasPorUnidade(p, id); });
     });
     var kgDiaVendas = pecasLigadas && gramas30 > 0 ? gramas30 / 1000 / 30 : null;
     var ritmo = kgDiaVendas || kgDiaCompra;
