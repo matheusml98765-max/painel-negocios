@@ -1906,7 +1906,9 @@
     // So desconta o Ads quando ja existe custo cadastrado em algum produto da Shopee,
     // senao o lucro ficaria negativo sem os produtos que o Ads ajudou a vender.
     var shopeeComCusto = lucro.linhas.some(function (g) { return g.plataforma === 'shopee' && g.lucro !== null; });
-    var adsDesc = shopeeComCusto && ads30 ? ads30.gasto : 0;
+    var mlComCusto = lucro.linhas.some(function (g) { return g.plataforma === 'ml' && g.lucro !== null; });
+    var adsSpDesc = shopeeComCusto && ads30 ? ads30.gasto : 0, adsMlDesc = mlComCusto ? (adsMlNoPeriodo(30) || 0) : 0;
+    var adsDesc = adsSpDesc + adsMlDesc;
 
     // Saudacao
     var agora = new Date();
@@ -1949,7 +1951,7 @@
     }
     var mes = el('div', { class: 'ini-mes' }, [
       kpi('Faturamento de ' + nomeMes, fmtMoney(d.mes.total), d.mes.pedidos + ' pedidos · ticket ' + fmtMoney(d.mes.pedidos ? d.mes.total / d.mes.pedidos : 0)),
-      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
+      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads' + (adsSpDesc && adsMlDesc ? ' do ML e da Shopee' : adsMlDesc ? ' do ML' : ' da Shopee') : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
       kpi('As plataformas ficaram com', levou === null ? '—' : fmtPct(levou), 'ML ' + fmtPct(ficouMl) + ' · Shopee ' + fmtPct(ficouShopee) + ' das vendas, antes do Ads'),
       kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
@@ -3165,6 +3167,28 @@
     });
     linhas.sort(function (p, q) { return q.gasto - p.gasto; });
     return { dias: fontes[0].dias, linhas: linhas, plataformas: fontes.map(function (f) { return f.plat; }) };
+  }
+
+  // Product Ads do ML pelo gasto de cada dia de cada anuncio (anuncios_ml.json: por_item[id].dias e por_dia).
+  // Cada produto tem a sua campanha: o gasto vai para o lucro do proprio anuncio. Sem os dias (versao
+  // antiga do arquivo), usa o total de 30 dias proporcional.
+  function adsMl() { return (state.anunciosMl && state.anunciosMl.ads) || null; }
+  function adsMlDoItem(itemId, dias) {
+    var ml = adsMl(); if (!ml || !ml.por_item) return 0;
+    var x = ml.por_item[itemId] || ml.por_item[String(itemId).toUpperCase()]; if (!x) return 0;
+    if (ml.por_dia) { var lim = limiteDias(dias); return Object.keys(x.dias || {}).reduce(function (s, d) { return s + (d >= lim ? Number(x.dias[d]) || 0 : 0); }, 0); }
+    return (Number(x.gasto) || 0) * dias / (Number(ml.dias) || 30);
+  }
+  function adsMlNoPeriodo(dias) {
+    var ml = adsMl(); if (!ml || !ml.por_item || !Object.keys(ml.por_item).length) return null;
+    if (ml.por_dia) { var lim = limiteDias(dias); return Object.keys(ml.por_dia).reduce(function (s, d) { return s + (d >= lim ? Number(ml.por_dia[d]) || 0 : 0); }, 0); }
+    return Object.keys(ml.por_item).reduce(function (s, id) { return s + (Number(ml.por_item[id].gasto) || 0); }, 0) * dias / (Number(ml.dias) || 30);
+  }
+  // Gasto do dia (null = esse dia nao tem dado de Ads do ML)
+  function adsMlNoDia(dia) {
+    var ml = adsMl(); if (!ml || !ml.por_dia) return null;
+    if (ml.de && dia < ml.de) return null;
+    return Number(ml.por_dia[dia]) || 0;
   }
 
   // Unidades vendidas por anuncio nos ultimos N dias.
@@ -4639,8 +4663,17 @@
     });
     r.vendas.sort(function (a, b) { return String(b.t.dataHora || '').localeCompare(String(a.t.dataHora || '')); });
     var a = state.adsShopee && Array.isArray(state.adsShopee.dias) ? state.adsShopee.dias.find(function (x) { return x.data === dia; }) : null;
-    r.ads = a && plat !== 'ml' ? Number(a.gasto) || 0 : null;
+    r.adsShopee = a && plat !== 'ml' ? Number(a.gasto) || 0 : null;
+    r.adsMl = plat !== 'shopee' ? adsMlNoDia(dia) : null;
+    r.ads = (r.adsShopee === null && r.adsMl === null) ? null : (r.adsShopee || 0) + (r.adsMl || 0);
     return r;
+  }
+
+  function textoAds(r) {
+    var p = [];
+    if (r.adsMl) p.push(fmtMoney(r.adsMl) + ' de Ads do ML');
+    if (r.adsShopee) p.push(fmtMoney(r.adsShopee) + ' de Ads da Shopee');
+    return p.join(' e ');
   }
 
   function tokenAtualizar() { try { return localStorage.getItem('pml_ml-gh-token') || ''; } catch (e) { return ''; } }
@@ -4719,7 +4752,7 @@
       metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + (loja === 'todas' ? ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) : '') + (function () { var o = calcVendasDoDia(addDias(dia, -1), loja).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : dia === ontem ? 'anteontem' : 'o dia anterior') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
-      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
+      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + textoAds(r) : ''), lucroDia >= 0 ? 'pos' : 'neg'),
       metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : (margemMedia !== null ? 'média dos produtos ' + fmtPct(margemMedia) + ' · ' : '') + 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
     ]));
     if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + (loja === 'ml' ? 'no Mercado Livre ' : loja === 'shopee' ? 'na Shopee ' : '') + nomeDia + (dia === hoje ? ' até a última atualização.' : '.') })); grid.appendChild(bloco); return; }
@@ -5808,7 +5841,7 @@
     var ads = calcAdsPorProduto(plat || 'todas'), gasto = {}, decAds = {};
     ((ads && ads.linhas) || []).forEach(function (x) {
       var k = String(x.itemId).toUpperCase();
-      gasto[k] = (gasto[k] || 0) + x.gasto * (dias / (ads.dias || 30));
+      gasto[k] = (gasto[k] || 0) + (x.plataforma === 'ml' ? adsMlDoItem(x.itemId, dias) : x.gasto * (dias / (ads.dias || 30)));
       decAds[k] = x.decisao;   // a mesma decisao do quadro de Ads (ACOS x margem), para os dois nao se contradizerem
     });
     return calcLucroPorProduto(dias, plat || 'todas').linhas.filter(function (g) { return g.lucro !== null && g.unidades > 0; }).map(function (g) {
@@ -6002,7 +6035,7 @@
     ]));
     card.appendChild(el('div', { class: 'pml-metrics', style: 'margin:12px 0;' }, [
       metricaFicha('Vendido no mês', fmtMoney(c.tot.bruto), c.tot.vendas + ' vendas em ' + c.diasComVenda + ' dia(s)'),
-      metricaFicha('Lucro dos dias', fmtMoney(c.tot.lucro), 'depois de taxas, imposto, custo e Ads da Shopee', c.tot.lucro >= 0 ? 'pos' : 'neg'),
+      metricaFicha('Lucro dos dias', fmtMoney(c.tot.lucro), 'depois de taxas, imposto, custo e Ads (ML e Shopee)', c.tot.lucro >= 0 ? 'pos' : 'neg'),
       metricaFicha('Margem do mês', c.margem === null ? '—' : fmtPct(c.margem), 'lucro ÷ faturamento'),
       metricaFicha('Melhor dia', c.melhor ? c.melhor.dia.slice(8) + '/' + mes.slice(5) : '—', c.melhor ? 'lucro ' + fmtMoney(c.melhor.lucro || 0) + ' · ' + c.melhor.vendas + ' vendas' : '')
     ]));
@@ -6025,7 +6058,7 @@
       ].filter(Boolean)));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [grade]));
-    card.appendChild(el('p', { class: 'pml-note', text: 'Cada dia: vendido · lucro · margem. Verde = lucro (mais forte, mais lucro); vermelho = prejuízo. Clique num dia para ver tudo dele. O Ads da Shopee entra no dia em que foi gasto; o Ads do ML, a antecipação e o Full ficam no mês (aba Relatório).' }));
+    card.appendChild(el('p', { class: 'pml-note', text: 'Cada dia: vendido · lucro · margem. Verde = lucro (mais forte, mais lucro); vermelho = prejuízo. Clique num dia para ver tudo dele. O Ads do ML e da Shopee entra no dia em que foi gasto; a antecipação e o Full ficam no mês (aba Relatório).' }));
     wrap.appendChild(card);
     if (state.calDia && state.calDia.slice(0, 7) === mes) renderDiaCalendario(wrap, resumoDia(state.calDia));
   }
@@ -6038,7 +6071,7 @@
       metricaFicha('Vendido', fmtMoney(x.bruto), x.vendas + ' vendas · ' + x.unidades + ' unidade(s)'),
       metricaFicha('Cai na conta', fmtMoney(x.liquido), 'taxas e frete ' + fmtMoney(x.bruto - x.liquido) + (r.semTaxas ? ' · ' + r.semTaxas + ' sem taxas ainda' : ''), 'pos'),
       metricaFicha('Imposto + custo', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
-      metricaFicha('Lucro', x.lucro === null ? '—' : fmtMoney(x.lucro), x.ads ? 'já tirando ' + fmtMoney(x.ads) + ' de Ads da Shopee' : 'sem Ads da Shopee nesse dia', x.lucro !== null && x.lucro < 0 ? 'neg' : 'pos'),
+      metricaFicha('Lucro', x.lucro === null ? '—' : fmtMoney(x.lucro), x.ads ? 'já tirando ' + textoAds(x.r) : 'sem Ads nesse dia', x.lucro !== null && x.lucro < 0 ? 'neg' : 'pos'),
       metricaFicha('Margem', x.margem === null ? '—' : fmtPct(x.margem), 'lucro ÷ faturamento'),
       metricaFicha('Ticket médio', x.vendas ? fmtMoney(x.bruto / x.vendas) : '—', 'ML ' + x.plat.ml.n + ' (' + fmtMoney(x.plat.ml.v) + ') · Shopee ' + x.plat.shopee.n + ' (' + fmtMoney(x.plat.shopee.v) + ')')
     ]));
@@ -6304,16 +6337,13 @@
   // Mercado Livre e Shopee lado a lado: faturamento, recebido, lucro dos produtos, Ads e o que sobrou.
 
   // Ads de uma loja no periodo. Shopee: gasto da conta por dia (ads_shopee.json).
-  // ML: Product Ads de cada anuncio (anuncios_ml.json), proporcional aos dias.
+  // ML: Product Ads pelo gasto de cada dia (anuncios_ml.json por_dia).
   function adsDaLoja(plat, dias) {
     if (plat === 'shopee') {
       var sp = adsShopeeNoPeriodo(dias);
       return sp ? sp.gasto : null;
     }
-    var ml = state.anunciosMl && state.anunciosMl.ads;
-    if (!ml || !ml.por_item || !Object.keys(ml.por_item).length) return null;
-    var base = Number(ml.dias) || 30;
-    return Object.keys(ml.por_item).reduce(function (s, id) { return s + (Number(ml.por_item[id].gasto) || 0); }, 0) * (dias / base);
+    return adsMlNoPeriodo(dias);
   }
 
   // Parte da conta de todas as lojas juntas e separa por plataforma: assim as perdas com falhas

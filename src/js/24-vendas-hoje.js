@@ -30,8 +30,17 @@
     });
     r.vendas.sort(function (a, b) { return String(b.t.dataHora || '').localeCompare(String(a.t.dataHora || '')); });
     var a = state.adsShopee && Array.isArray(state.adsShopee.dias) ? state.adsShopee.dias.find(function (x) { return x.data === dia; }) : null;
-    r.ads = a && plat !== 'ml' ? Number(a.gasto) || 0 : null;
+    r.adsShopee = a && plat !== 'ml' ? Number(a.gasto) || 0 : null;
+    r.adsMl = plat !== 'shopee' ? adsMlNoDia(dia) : null;
+    r.ads = (r.adsShopee === null && r.adsMl === null) ? null : (r.adsShopee || 0) + (r.adsMl || 0);
     return r;
+  }
+
+  function textoAds(r) {
+    var p = [];
+    if (r.adsMl) p.push(fmtMoney(r.adsMl) + ' de Ads do ML');
+    if (r.adsShopee) p.push(fmtMoney(r.adsShopee) + ' de Ads da Shopee');
+    return p.join(' e ');
   }
 
   function tokenAtualizar() { try { return localStorage.getItem('pml_ml-gh-token') || ''; } catch (e) { return ''; } }
@@ -110,7 +119,7 @@
       metricaFicha('Vendido', fmtMoney(r.bruto), r.vendas.length + (r.vendas.length === 1 ? ' venda' : ' vendas') + (r.vendas.length ? ' · ticket ' + fmtMoney(r.bruto / r.vendas.length) : '') + (loja === 'todas' ? ' · ML ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'ml' ? v.valor : 0); }, 0)) + ' · Shopee ' + fmtMoney(r.vendas.reduce(function (s, v) { return s + (v.plataforma === 'shopee' ? v.valor : 0); }, 0)) : '') + (function () { var o = calcVendasDoDia(addDias(dia, -1), loja).bruto; return o > 0 ? ' · ' + (r.bruto >= o ? '▲ ' : '▼ ') + fmtPct(Math.abs(r.bruto / o - 1)) + ' contra ' + (dia === hoje ? 'ontem' : dia === ontem ? 'anteontem' : 'o dia anterior') : ''; })()),
       metricaFicha('Cai na sua conta', fmtMoney(r.liquido), r.semTaxas ? r.semTaxas + ' venda(s) com as taxas ainda chegando' : 'depois de comissão, taxas e frete', 'pos'),
       metricaFicha('Imposto + custo dos produtos', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
-      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + fmtMoney(r.ads) + ' de Ads da Shopee' : ''), lucroDia >= 0 ? 'pos' : 'neg'),
+      metricaFicha('Lucro', r.comLucro ? fmtMoney(lucroDia) : '—', !r.comLucro ? 'falta custo ou taxa das vendas' : (r.comLucro < r.vendas.length ? 'de ' + r.comLucro + ' das ' + r.vendas.length + ' vendas' : 'de todas as vendas') + (r.ads ? ', já tirando ' + textoAds(r) : ''), lucroDia >= 0 ? 'pos' : 'neg'),
       metricaFicha('Margem do dia', margemDia === null ? '—' : fmtPct(margemDia), margemDia === null ? 'falta custo ou taxa das vendas' : (margemMedia !== null ? 'média dos produtos ' + fmtPct(margemMedia) + ' · ' : '') + 'lucro ÷ faturamento' + (brutoComLucro < r.bruto - 0.01 ? ' (' + fmtMoney(brutoComLucro) + ' das vendas com lucro)' : ' (' + fmtMoney(r.bruto) + ')'), margemDia !== null && margemDia < 0 ? 'neg' : 'pos')
     ]));
     if (!r.vendas.length) { bloco.appendChild(el('div', { class: 'pml-empty', text: 'Nenhuma venda ' + (loja === 'ml' ? 'no Mercado Livre ' : loja === 'shopee' ? 'na Shopee ' : '') + nomeDia + (dia === hoje ? ' até a última atualização.' : '.') })); grid.appendChild(bloco); return; }

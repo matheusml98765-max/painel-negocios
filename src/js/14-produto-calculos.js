@@ -113,6 +113,28 @@
     return { dias: fontes[0].dias, linhas: linhas, plataformas: fontes.map(function (f) { return f.plat; }) };
   }
 
+  // Product Ads do ML pelo gasto de cada dia de cada anuncio (anuncios_ml.json: por_item[id].dias e por_dia).
+  // Cada produto tem a sua campanha: o gasto vai para o lucro do proprio anuncio. Sem os dias (versao
+  // antiga do arquivo), usa o total de 30 dias proporcional.
+  function adsMl() { return (state.anunciosMl && state.anunciosMl.ads) || null; }
+  function adsMlDoItem(itemId, dias) {
+    var ml = adsMl(); if (!ml || !ml.por_item) return 0;
+    var x = ml.por_item[itemId] || ml.por_item[String(itemId).toUpperCase()]; if (!x) return 0;
+    if (ml.por_dia) { var lim = limiteDias(dias); return Object.keys(x.dias || {}).reduce(function (s, d) { return s + (d >= lim ? Number(x.dias[d]) || 0 : 0); }, 0); }
+    return (Number(x.gasto) || 0) * dias / (Number(ml.dias) || 30);
+  }
+  function adsMlNoPeriodo(dias) {
+    var ml = adsMl(); if (!ml || !ml.por_item || !Object.keys(ml.por_item).length) return null;
+    if (ml.por_dia) { var lim = limiteDias(dias); return Object.keys(ml.por_dia).reduce(function (s, d) { return s + (d >= lim ? Number(ml.por_dia[d]) || 0 : 0); }, 0); }
+    return Object.keys(ml.por_item).reduce(function (s, id) { return s + (Number(ml.por_item[id].gasto) || 0); }, 0) * dias / (Number(ml.dias) || 30);
+  }
+  // Gasto do dia (null = esse dia nao tem dado de Ads do ML)
+  function adsMlNoDia(dia) {
+    var ml = adsMl(); if (!ml || !ml.por_dia) return null;
+    if (ml.de && dia < ml.de) return null;
+    return Number(ml.por_dia[dia]) || 0;
+  }
+
   // Unidades vendidas por anuncio nos ultimos N dias.
   function unidadesPorItem(dias) {
     var lim = limiteDias(dias);

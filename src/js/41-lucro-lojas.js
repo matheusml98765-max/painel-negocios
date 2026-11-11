@@ -2,16 +2,13 @@
   // Mercado Livre e Shopee lado a lado: faturamento, recebido, lucro dos produtos, Ads e o que sobrou.
 
   // Ads de uma loja no periodo. Shopee: gasto da conta por dia (ads_shopee.json).
-  // ML: Product Ads de cada anuncio (anuncios_ml.json), proporcional aos dias.
+  // ML: Product Ads pelo gasto de cada dia (anuncios_ml.json por_dia).
   function adsDaLoja(plat, dias) {
     if (plat === 'shopee') {
       var sp = adsShopeeNoPeriodo(dias);
       return sp ? sp.gasto : null;
     }
-    var ml = state.anunciosMl && state.anunciosMl.ads;
-    if (!ml || !ml.por_item || !Object.keys(ml.por_item).length) return null;
-    var base = Number(ml.dias) || 30;
-    return Object.keys(ml.por_item).reduce(function (s, id) { return s + (Number(ml.por_item[id].gasto) || 0); }, 0) * (dias / base);
+    return adsMlNoPeriodo(dias);
   }
 
   // Parte da conta de todas as lojas juntas e separa por plataforma: assim as perdas com falhas

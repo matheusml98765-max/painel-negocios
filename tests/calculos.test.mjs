@@ -677,6 +677,16 @@ test('insumo por pedido: 2 kits de 2 (4 peças) numa caixa só', () => {
   perto(p.custoDaLinha(kit, 2) - kit.valor, kit.valor - 1, 'pedido com 2 kits: 4 peças e ainda 1 caixa');
 });
 
+test('Ads do ML pelo gasto de cada dia, no anúncio certo', () => {
+  const p = painelBase();
+  const hoje = new Date(); const iso = d => { const x = new Date(hoje); x.setDate(x.getDate() - d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  p.state.anunciosMl = { ads: { dias: 30, de: iso(29), por_dia: { [iso(0)]: 5, [iso(10)]: 20 },
+    por_item: { MLB1: { gasto: 25, dias: { [iso(0)]: 5, [iso(10)]: 20 } } } } };
+  const lojas = p.calcLucroPorLoja(7);
+  perto(lojas.find(l => l.plataforma === 'ml').ads, 5, 'só os gastos dos últimos 7 dias');
+  perto(p.calcLucroPorLoja(30).find(l => l.plataforma === 'ml').ads, 25, '30 dias = tudo');
+});
+
 test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
   const p = painelBase();
   p.state.custosAvulsos = { MLB1: 3, '2': 5 };

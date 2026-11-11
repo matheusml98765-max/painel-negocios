@@ -82,7 +82,7 @@
     var ads = calcAdsPorProduto(plat || 'todas'), gasto = {}, decAds = {};
     ((ads && ads.linhas) || []).forEach(function (x) {
       var k = String(x.itemId).toUpperCase();
-      gasto[k] = (gasto[k] || 0) + x.gasto * (dias / (ads.dias || 30));
+      gasto[k] = (gasto[k] || 0) + (x.plataforma === 'ml' ? adsMlDoItem(x.itemId, dias) : x.gasto * (dias / (ads.dias || 30)));
       decAds[k] = x.decisao;   // a mesma decisao do quadro de Ads (ACOS x margem), para os dois nao se contradizerem
     });
     return calcLucroPorProduto(dias, plat || 'todas').linhas.filter(function (g) { return g.lucro !== null && g.unidades > 0; }).map(function (g) {

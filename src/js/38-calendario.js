@@ -50,7 +50,7 @@
     ]));
     card.appendChild(el('div', { class: 'pml-metrics', style: 'margin:12px 0;' }, [
       metricaFicha('Vendido no mês', fmtMoney(c.tot.bruto), c.tot.vendas + ' vendas em ' + c.diasComVenda + ' dia(s)'),
-      metricaFicha('Lucro dos dias', fmtMoney(c.tot.lucro), 'depois de taxas, imposto, custo e Ads da Shopee', c.tot.lucro >= 0 ? 'pos' : 'neg'),
+      metricaFicha('Lucro dos dias', fmtMoney(c.tot.lucro), 'depois de taxas, imposto, custo e Ads (ML e Shopee)', c.tot.lucro >= 0 ? 'pos' : 'neg'),
       metricaFicha('Margem do mês', c.margem === null ? '—' : fmtPct(c.margem), 'lucro ÷ faturamento'),
       metricaFicha('Melhor dia', c.melhor ? c.melhor.dia.slice(8) + '/' + mes.slice(5) : '—', c.melhor ? 'lucro ' + fmtMoney(c.melhor.lucro || 0) + ' · ' + c.melhor.vendas + ' vendas' : '')
     ]));
@@ -73,7 +73,7 @@
       ].filter(Boolean)));
     });
     card.appendChild(el('div', { class: 'pml-scroll' }, [grade]));
-    card.appendChild(el('p', { class: 'pml-note', text: 'Cada dia: vendido · lucro · margem. Verde = lucro (mais forte, mais lucro); vermelho = prejuízo. Clique num dia para ver tudo dele. O Ads da Shopee entra no dia em que foi gasto; o Ads do ML, a antecipação e o Full ficam no mês (aba Relatório).' }));
+    card.appendChild(el('p', { class: 'pml-note', text: 'Cada dia: vendido · lucro · margem. Verde = lucro (mais forte, mais lucro); vermelho = prejuízo. Clique num dia para ver tudo dele. O Ads do ML e da Shopee entra no dia em que foi gasto; a antecipação e o Full ficam no mês (aba Relatório).' }));
     wrap.appendChild(card);
     if (state.calDia && state.calDia.slice(0, 7) === mes) renderDiaCalendario(wrap, resumoDia(state.calDia));
   }
@@ -86,7 +86,7 @@
       metricaFicha('Vendido', fmtMoney(x.bruto), x.vendas + ' vendas · ' + x.unidades + ' unidade(s)'),
       metricaFicha('Cai na conta', fmtMoney(x.liquido), 'taxas e frete ' + fmtMoney(x.bruto - x.liquido) + (r.semTaxas ? ' · ' + r.semTaxas + ' sem taxas ainda' : ''), 'pos'),
       metricaFicha('Imposto + custo', fmtMoney(r.imposto + r.custo), 'imposto ' + fmtMoney(r.imposto) + ' · produtos ' + fmtMoney(r.custo)),
-      metricaFicha('Lucro', x.lucro === null ? '—' : fmtMoney(x.lucro), x.ads ? 'já tirando ' + fmtMoney(x.ads) + ' de Ads da Shopee' : 'sem Ads da Shopee nesse dia', x.lucro !== null && x.lucro < 0 ? 'neg' : 'pos'),
+      metricaFicha('Lucro', x.lucro === null ? '—' : fmtMoney(x.lucro), x.ads ? 'já tirando ' + textoAds(x.r) : 'sem Ads nesse dia', x.lucro !== null && x.lucro < 0 ? 'neg' : 'pos'),
       metricaFicha('Margem', x.margem === null ? '—' : fmtPct(x.margem), 'lucro ÷ faturamento'),
       metricaFicha('Ticket médio', x.vendas ? fmtMoney(x.bruto / x.vendas) : '—', 'ML ' + x.plat.ml.n + ' (' + fmtMoney(x.plat.ml.v) + ') · Shopee ' + x.plat.shopee.n + ' (' + fmtMoney(x.plat.shopee.v) + ')')
     ]));

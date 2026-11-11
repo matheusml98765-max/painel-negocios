@@ -17,7 +17,9 @@
     // So desconta o Ads quando ja existe custo cadastrado em algum produto da Shopee,
     // senao o lucro ficaria negativo sem os produtos que o Ads ajudou a vender.
     var shopeeComCusto = lucro.linhas.some(function (g) { return g.plataforma === 'shopee' && g.lucro !== null; });
-    var adsDesc = shopeeComCusto && ads30 ? ads30.gasto : 0;
+    var mlComCusto = lucro.linhas.some(function (g) { return g.plataforma === 'ml' && g.lucro !== null; });
+    var adsSpDesc = shopeeComCusto && ads30 ? ads30.gasto : 0, adsMlDesc = mlComCusto ? (adsMlNoPeriodo(30) || 0) : 0;
+    var adsDesc = adsSpDesc + adsMlDesc;
 
     // Saudacao
     var agora = new Date();
@@ -60,7 +62,7 @@
     }
     var mes = el('div', { class: 'ini-mes' }, [
       kpi('Faturamento de ' + nomeMes, fmtMoney(d.mes.total), d.mes.pedidos + ' pedidos · ticket ' + fmtMoney(d.mes.pedidos ? d.mes.total / d.mes.pedidos : 0)),
-      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads da Shopee' : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
+      kpi('Lucro real (30 dias)', fmtMoney(tot.lucro - adsDesc), tot.receitaComCusto ? 'margem de ' + fmtPct((tot.lucro - adsDesc) / tot.receitaComCusto) + ', já sem imposto' + (adsDesc ? ' e sem o Ads' + (adsSpDesc && adsMlDesc ? ' do ML e da Shopee' : adsMlDesc ? ' do ML' : ' da Shopee') : '') : 'cadastre os custos na aba Lucro por produto', (tot.lucro - adsDesc) >= 0 ? 'pos' : 'neg'),
       kpi('As plataformas ficaram com', levou === null ? '—' : fmtPct(levou), 'ML ' + fmtPct(ficouMl) + ' · Shopee ' + fmtPct(ficouShopee) + ' das vendas, antes do Ads'),
       kpi('Shopee Ads (30 dias)', ads30 ? fmtMoney(ads30.gasto) : '—', ads30 ? 'trouxe ' + fmtMoney(ads30.vendas) + ' em vendas (' + fmtPct(ads30.vendas ? ads30.gasto / ads30.vendas : null) + ' gasto)' : 'chega pela automação da Shopee')
     ]);
