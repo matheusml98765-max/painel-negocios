@@ -664,6 +664,19 @@ test('anúncio de kit fixo no ML (MLB1x2): custo de 2 peças com a caixa do kit'
   assert.equal(p.custo3dDoAnuncio('MLB2X2'), null, 'o sufixo não vira outro anúncio');
 });
 
+test('insumo por pedido: 2 kits de 2 (4 peças) numa caixa só', () => {
+  const p = painelBase();
+  const c = p.getCalc3d();
+  c.embalagens = [{ id: 'a', data: '2026-01-01', nome: 'Caixa', qtd: 10, preco: 10, frete: 0 },
+                  { id: 'b', data: '2026-01-01', nome: 'Fita', qtd: 10, preco: 1, frete: 0 }];
+  c.produtos = [{ id: 'x', nome: 'Peça', tipo: 'PETG', gramas: 10, horas: 1, porPlaca: 1, anuncios: 'MLB1, MLB2x2',
+    insumos: [{ nome: 'Caixa', qtd: 1, porPedido: true }, { nome: 'Fita', qtd: 1 }] }];
+  p.state.calc3d = c;
+  const um = p.custoDoItem('MLB1', '2026-11-01'), kit = p.custoDoItem('MLB2', '2026-11-01');
+  perto(kit.valor - um.valor, um.valor - 1, 'kit de 2 sozinho: 2 peças e 1 caixa');
+  perto(p.custoDaLinha(kit, 2) - kit.valor, kit.valor - 1, 'pedido com 2 kits: 4 peças e ainda 1 caixa');
+});
+
 test('lucro por loja separa ML e Shopee e desconta o Ads de cada uma', () => {
   const p = painelBase();
   p.state.custosAvulsos = { MLB1: 3, '2': 5 };

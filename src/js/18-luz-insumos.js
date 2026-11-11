@@ -29,7 +29,7 @@
         var e = r.pecas[p.id] || (r.pecas[p.id] = { nome: p.nome, unidades: 0, horas: 0, gramas: 0, kwh: 0 });
         e.unidades += qtd; e.horas += h; e.gramas += num(p.gramas) / porPlaca * qtd * perda; e.kwh += kwh;
         r.unidades += qtd; r.horas += h; r.gramas += num(p.gramas) / porPlaca * qtd * perda; r.kwh += kwh;
-        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id), kitVenda).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * qtd; });
+        insumosNaData(p, t.data, plataformaDoAnuncio(i.item_id), kitVenda).forEach(function (s) { r.insumos[s.nome] = (r.insumos[s.nome] || 0) + num(s.qtd) * (s.porPedido ? 1 : qtd); });
       });
     });
     if (typeof falhasNoPeriodo === 'function') {
@@ -62,7 +62,7 @@
       if (t.tipo !== 'venda' || !Array.isArray(t.itens) || !t.data || t.data < ini) return;
       t.itens.forEach(function (i) {
         var p = pecaDoItem(i.item_id);
-        if (p) { var nK = pecasPorUnidade(p, i.item_id); insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id), i.kit || (nK > 1 ? nK : undefined)).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (Number(i.quantidade) || 1) * nK; }); }
+        if (p) { var nK = pecasPorUnidade(p, i.item_id); insumosNaData(p, hojeIso, plataformaDoAnuncio(i.item_id), i.kit || (nK > 1 ? nK : undefined)).forEach(function (s) { usoPrevisto[s.nome] = (usoPrevisto[s.nome] || 0) + num(s.qtd) * (s.porPedido ? 1 : (Number(i.quantidade) || 1) * nK); }); }
       });
     });
     return itens.map(function (it) {

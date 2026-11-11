@@ -141,11 +141,14 @@
     var manutencao = horas * num(c.manutencaoHora);
     var porPeca = (material + energia + desgaste + manutencao) / porPlaca;
     var perda = porPeca * num(c.perdaPct) / 100;
-    var emb = insumosNaData(p, dataRef, plat, kit).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    // Insumo "porPedido": vai uma vez por pedido, nao por peca (ex.: 4 organizadores numa caixa so)
+    var ins = insumosNaData(p, dataRef, plat, kit);
+    var emb = ins.reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
+    var pedido = ins.filter(function (i) { return i.porPedido; }).reduce(function (s, i) { return s + custoEmbalagem(i.nome, dataRef) * num(i.qtd); }, 0);
     var extras = num(p.extras);
     return {
       material: material / porPlaca, energia: energia / porPlaca, desgaste: desgaste / porPlaca,
-      manutencao: manutencao / porPlaca, perda: perda, embalagem: emb, extras: extras,
+      manutencao: manutencao / porPlaca, perda: perda, embalagem: emb, extras: extras, pedido: pedido,
       total: porPeca + perda + emb + extras
     };
   }
@@ -173,6 +176,14 @@
     var n = 0;
     var p = state.calc3d.produtos.find(function (x) { n = pecasPorUnidade(x, id); return n > 0; });
     if (!p || !(num(p.gramas) > 0) || !(num(p.horas) > 0)) return null;  // peca ainda sem gramas/horas
-    return custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit || (n > 1 ? n : undefined)).total * n;
+    var cp = custoPeca3d(p, dataRef, plataformaDoAnuncio(id), kit || (n > 1 ? n : undefined));
+    _ultimoPedido3d = cp.pedido;
+    return (cp.total - cp.pedido) * n + cp.pedido;   // custo de 1 unidade do anuncio num pedido sozinho
+  }
+  var _ultimoPedido3d = 0;
+  // Custo de uma linha de pedido com qtd unidades: o que vai por pedido entra uma vez so
+  function custoDaLinha(cv, qtd) {
+    var q = Number(qtd) || 1, fixo = (cv && cv.pedido) || 0;
+    return cv ? (cv.valor - fixo) * q + fixo : 0;
   }
 

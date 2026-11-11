@@ -21,7 +21,7 @@
   function custoDoItem(itemId, dataRef, kit) {
     var id = String(itemId || '').trim().toUpperCase();
     var c3d = custo3dDoAnuncio(id, dataRef, kit);
-    if (c3d !== null) return { valor: c3d, fonte: '3d' };
+    if (c3d !== null) return { valor: c3d, fonte: '3d', pedido: _ultimoPedido3d };
     var prod = state.produtos.find(function (p) { return String(p.mlItemId || '').trim().toUpperCase() === id && id; });
     if (prod && prod.custo !== '' && !isNaN(Number(prod.custo))) return { valor: Number(prod.custo), fonte: 'estoque' };
     if (state.custosAvulsos[id] !== undefined && state.custosAvulsos[id] !== '') return { valor: Number(state.custosAvulsos[id]), fonte: 'avulso' };
@@ -124,7 +124,7 @@
         if (!c.devolvido) {
           g.unidades += qtd;
           var cv = custoDoItem(id, t.data, i.kit);
-          if (cv) { g.custoAcum += cv.valor * qtd; g.fonteVenda = cv.fonte; } else g.semCusto = true;
+          if (cv) { g.custoAcum += custoDaLinha(cv, qtd); g.fonteVenda = cv.fonte; } else g.semCusto = true;
         } else g.devolvidas = (g.devolvidas || 0) + 1;
         g.vendas += 1;
         if (!c.devolvido) { g.receita += valor * parte; g.freteComprador = (g.freteComprador || 0) + (Number(t.freteComprador) || 0) * parte; }   // devolvida: a nota e cancelada, fica so o prejuizo
